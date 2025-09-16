@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-900 text-white;
+  }
+}
+
+@layer utilities {
+  /* Hide default browser password toggle */
+  input[type="password"]::-webkit-credentials-auto-fill-button,
+  input[type="password"]::-webkit-credentials-auto-fill-button:hover,
+  input[type="password"]::-webkit-credentials-auto-fill-button:active {
+    display: none !important;
+  }
+  
+  /* Hide default browser eye icon */
+  input[type="password"]::-ms-reveal,
+  input[type="password"]::-ms-clear {
+    display: none !important;
+  }
+}
