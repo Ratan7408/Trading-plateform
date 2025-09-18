@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
-const MarketDashboard = ({ onTabChange }) => {
+const MarketDashboard = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('invest');
   const [cryptoData, setCryptoData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -96,20 +99,60 @@ const MarketDashboard = ({ onTabChange }) => {
   }, []);
 
   const navigationItems = [
-    { id: 'home', icon: '🏠', label: 'Home' },
-    { id: 'team', icon: '👥', label: 'Team' },
-    { id: 'telegram', icon: '✈️', label: 'Telegram' },
-    { id: 'invest', icon: '📊', label: 'Invest' },
-    { id: 'profile', icon: '👤', label: 'Profile' }
+    { 
+      id: 'home', 
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        </svg>
+      ), 
+      label: 'Home' 
+    },
+    { 
+      id: 'signal', 
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      ), 
+      label: 'Signal' 
+    },
+    { 
+      id: 'team', 
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+      ), 
+      label: 'Team' 
+    },
+    { 
+      id: 'assets', 
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+        </svg>
+      ), 
+      label: 'Assets' 
+    },
+    { 
+      id: 'profile', 
+      icon: (
+        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+        </svg>
+      ), 
+      label: 'Account' 
+    }
   ];
 
   const handleTabClick = (tabId) => {
     setActiveTab(tabId);
-    onTabChange(tabId);
+    navigate(`/${tabId}`);
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white pb-20">
+    <div className="min-h-screen text-white pb-20" style={{ backgroundColor: '#121818' }}>
       {/* Header */}
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
@@ -119,15 +162,15 @@ const MarketDashboard = ({ onTabChange }) => {
             </div>
             <div>
               <h1 className="text-white font-semibold text-lg">Market</h1>
-              <p className="text-slate-400 text-sm">Live Crypto Prices</p>
+              <p className="text-gray-400 text-sm">Live Crypto Prices</p>
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            <button className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center">
-              <span className="text-slate-300 text-sm">🔍</span>
+            <button className="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center">
+              <span className="text-gray-300 text-sm">🔍</span>
             </button>
-            <button className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center">
-              <span className="text-slate-300 text-sm">🔽</span>
+            <button className="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center">
+              <span className="text-gray-300 text-sm">🔽</span>
             </button>
           </div>
         </div>
@@ -135,12 +178,12 @@ const MarketDashboard = ({ onTabChange }) => {
         {/* Market Stats */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           {marketStats.map((stat, index) => (
-            <div key={index} className="bg-slate-800/50 rounded-xl p-4 text-center">
+            <div key={index} className="bg-gray-800/50 rounded-xl p-4 text-center">
               <div className={`w-10 h-10 bg-gradient-to-br ${stat.color} rounded-lg flex items-center justify-center mx-auto mb-2`}>
                 <span className="text-white text-lg">{stat.icon}</span>
               </div>
               <p className="text-white text-lg font-bold">{stat.value}</p>
-              <p className="text-slate-400 text-xs">{stat.label}</p>
+              <p className="text-gray-400 text-xs">{stat.label}</p>
             </div>
           ))}
         </div>
@@ -162,14 +205,14 @@ const MarketDashboard = ({ onTabChange }) => {
             {loading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-400"></div>
-                <span className="ml-3 text-slate-400">Loading live prices...</span>
+                <span className="ml-3 text-gray-400">Loading live prices...</span>
               </div>
             ) : (
               cryptoData.map((crypto, index) => (
-                <div key={crypto.id || index} className="bg-slate-800/50 rounded-xl p-4 flex items-center justify-between hover:bg-slate-800/70 transition-colors">
+                <div key={crypto.id || index} className="bg-gray-800/50 rounded-xl p-4 flex items-center justify-between hover:bg-gray-800/70 transition-colors">
                   <div className="flex items-center space-x-3">
                     <div className="relative">
-                      <div className="w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center overflow-hidden">
+                      <div className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center overflow-hidden">
                         <img 
                           src={crypto.image} 
                           alt={crypto.name}
@@ -196,7 +239,7 @@ const MarketDashboard = ({ onTabChange }) => {
                       </div>
                       <div className="flex items-center space-x-1">
                         <span className="text-yellow-400 text-sm">⭐</span>
-                        <p className="text-slate-400 text-sm">{crypto.ticker} #{crypto.rank}</p>
+                        <p className="text-gray-400 text-sm">{crypto.ticker} #{crypto.rank}</p>
                       </div>
                     </div>
                   </div>
@@ -226,7 +269,7 @@ const MarketDashboard = ({ onTabChange }) => {
       </div>
 
       {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-slate-800/90 backdrop-blur-sm border-t border-slate-700">
+      <div className="fixed bottom-0 left-0 right-0 bg-gray-800/90 backdrop-blur-sm border-t border-gray-700">
         <div className="flex justify-around py-2">
           {navigationItems.map((item) => (
             <button
@@ -235,7 +278,7 @@ const MarketDashboard = ({ onTabChange }) => {
               className={`flex flex-col items-center py-2 px-3 rounded-lg transition-colors ${
                 activeTab === item.id 
                   ? 'text-purple-400 bg-purple-500/20' 
-                  : 'text-slate-400 hover:text-slate-300'
+                  : 'text-gray-400 hover:text-gray-300'
               }`}
             >
               <span className="text-xl mb-1">{item.icon}</span>

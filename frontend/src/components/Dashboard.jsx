@@ -3,6 +3,7 @@ import HomeDashboard from './HomeDashboard';
 import TeamDashboard from './TeamDashboard';
 import MarketDashboard from './MarketDashboard';
 import InvestDashboard from './InvestDashboard';
+import Profile from './Profile';
 
 const Dashboard = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState('home');
@@ -18,7 +19,7 @@ const Dashboard = ({ onLogout }) => {
       case 'invest':
         return <MarketDashboard onTabChange={handleTabChange} />;
       case 'profile':
-        return <InvestDashboard onTabChange={handleTabChange} onLogout={onLogout} />;
+        return <Profile onBack={() => setActiveTab('home')} onLogout={onLogout} />;
       default:
         return <HomeDashboard onTabChange={handleTabChange} />;
     }

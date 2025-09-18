@@ -1,6 +1,9 @@
 import { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
-const InvestDashboard = ({ onTabChange, onLogout }) => {
+const InvestDashboard = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('profile');
 
   const financialOverview = [
@@ -33,103 +36,56 @@ const InvestDashboard = ({ onTabChange, onLogout }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white pb-20">
+    <div className="min-h-screen text-white" style={{ backgroundColor: '#121818' }}>
       {/* Header */}
       <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-teal-400 to-cyan-500 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">C</span>
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <h1 className="text-white font-semibold text-lg">Coral</h1>
-                <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded">VIP0</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <p className="text-slate-400 text-sm">8888888889</p>
-                <span className="text-slate-400 text-xs">📋</span>
-              </div>
-            </div>
-          </div>
-          <button 
-            onClick={onLogout}
-            className="bg-red-500 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
-          >
-            <span>→</span>
-            <span>Logout</span>
-          </button>
-        </div>
+        <button 
+          onClick={() => navigate('/home')}
+          className="flex items-center text-white hover:text-gray-300 transition-colors mb-6"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        
+        <h1 className="text-white text-xl font-semibold mb-8">Financial history</h1>
 
-        {/* Financial Overview */}
-        <div className="bg-gradient-to-r from-teal-500 to-cyan-500 rounded-xl p-6 mb-6">
-          <div className="grid grid-cols-3 gap-4">
-            {financialOverview.map((item, index) => (
-              <div key={index} className="text-center">
-                <p className="text-white text-2xl font-bold">{item.value}</p>
-                <p className="text-white/80 text-sm">{item.label}</p>
-              </div>
-            ))}
+        {/* Financial Summary */}
+        <div className="flex justify-between mb-12">
+          <div className="text-center">
+            <p className="text-white text-sm mb-1">Available</p>
+            <p className="text-white text-lg font-semibold">0.00</p>
+          </div>
+          <div className="text-center">
+            <p className="text-white text-sm mb-1">Total recharge</p>
+            <p className="text-white text-lg font-semibold">0.00</p>
+          </div>
+          <div className="text-center">
+            <p className="text-white text-sm mb-1">Total withdraw</p>
+            <p className="text-white text-lg font-semibold">0.00</p>
           </div>
         </div>
 
-        {/* Promotional Banner */}
-        <div className="bg-gradient-to-r from-teal-500 to-cyan-500 rounded-xl p-6 mb-6 relative overflow-hidden">
-          <div className="absolute inset-0 opacity-20">
-            <div className="absolute inset-0" style={{
-              backgroundImage: `
-                radial-gradient(circle at 20% 20%, rgba(255,255,255,0.1) 1px, transparent 1px),
-                radial-gradient(circle at 80% 80%, rgba(255,255,255,0.1) 1px, transparent 1px)
-              `,
-              backgroundSize: '50px 50px'
-            }}></div>
+        {/* No Data State */}
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="w-16 h-16 bg-gray-600 rounded-lg flex items-center justify-center mb-4">
+            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
           </div>
-          <div className="relative z-10 flex items-center justify-between">
-            <div>
-              <h2 className="text-white font-bold text-lg mb-1">Invite Friends</h2>
-              <p className="text-white/80 text-sm mb-1">Share Tcpatel</p>
-              <p className="text-white/60 text-xs">Quantitative Bonus</p>
-            </div>
-            <div className="text-right">
-              <h2 className="text-white font-bold text-lg mb-1">Wealth Contest</h2>
-              <p className="text-white/80 text-sm">Participate in the event and get rewards</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Action Cards Grid */}
-        <div className="grid grid-cols-3 gap-4">
-          {actionCards.map((card, index) => (
-            <div key={index} className="bg-gradient-to-br from-teal-500 to-cyan-500 rounded-xl p-4 text-center">
-              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mx-auto mb-3">
-                <span className="text-white text-xl">{card.icon}</span>
-              </div>
-              <p className="text-white text-sm font-medium">{card.title}</p>
-            </div>
-          ))}
+          <p className="text-gray-400 text-sm">no data</p>
         </div>
       </div>
 
-      {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-slate-800/90 backdrop-blur-sm border-t border-slate-700">
-        <div className="flex justify-around py-2">
-          {navigationItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handleTabClick(item.id)}
-              className={`flex flex-col items-center py-2 px-3 rounded-lg transition-colors ${
-                activeTab === item.id 
-                  ? 'text-teal-400' 
-                  : 'text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              <span className="text-xl mb-1">{item.icon}</span>
-              <span className="text-xs font-medium">{item.label}</span>
-              {activeTab === item.id && (
-                <div className="w-1 h-1 bg-teal-400 rounded-full mt-1"></div>
-              )}
-            </button>
-          ))}
+      {/* Action Buttons */}
+      <div className="fixed bottom-0 left-0 right-0 p-6" style={{ backgroundColor: '#121818' }}>
+        <div className="flex space-x-4">
+          <button className="flex-1 bg-blue-500 text-white py-4 rounded-lg font-semibold text-lg">
+            Recharge
+          </button>
+          <button className="flex-1 bg-blue-500 text-white py-4 rounded-lg font-semibold text-lg">
+            Withdraw
+          </button>
         </div>
       </div>
     </div>

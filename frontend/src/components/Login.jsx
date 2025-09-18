@@ -5,27 +5,47 @@ const Login = ({ onLogin }) => {
   const [phoneNumber, setPhoneNumber] = useState('8888888889');
   const [password, setPassword] = useState('123456');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Login attempt:', { phoneNumber, password });
-    // Simple validation - if credentials match, login
-    if (phoneNumber === '8888888889' && password === '123456') {
-      onLogin();
-    } else {
-      alert('Invalid credentials. Use 8888888889 / 123456');
+    
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: phoneNumber,
+          password: password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Store token in localStorage
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        onLogin();
+      } else {
+        alert(data.message || 'Login failed');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      alert('Network error. Please try again.');
     }
   };
 
   return (
-    <div className='min-h-screen bg-slate-900 relative'>
+    <div className='min-h-screen relative' style={{ backgroundColor: '#121818' }}>
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-20" style={{
-        backgroundImage: `radial-gradient(circle at 2px 2px, #0ea5e9 1px, transparent 0)`,
+        backgroundImage: `radial-gradient(circle at 2px 2px, #6b7280 1px, transparent 0)`,
         backgroundSize: '30px 30px'
       }}></div>
       
       {/* Gradient Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 via-transparent to-purple-900/20"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-800/20 via-transparent to-gray-700/20"></div>
 
       {/* Main Content */}
       <div className="relative z-10 min-h-screen flex flex-col">
@@ -33,10 +53,10 @@ const Login = ({ onLogin }) => {
         <div className="flex justify-between items-start p-6 md:p-8">
           <div className="text-left">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-2 tracking-tight">Hello</h1>
-            <p className="text-xl md:text-2xl text-cyan-400 font-medium tracking-wide">Welcome to CORAL</p>
+            <p className="text-xl md:text-2xl text-gray-300 font-medium tracking-wide">Welcome to CORAL</p>
           </div>
-          <div className="w-12 h-12 bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl flex items-center justify-center shadow-lg">
-            <div className="w-6 h-6 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-full flex items-center justify-center shadow-md">
+          <div className="w-12 h-12 bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl flex items-center justify-center shadow-lg">
+            <div className="w-6 h-6 bg-gradient-to-br from-gray-400 to-gray-500 rounded-full flex items-center justify-center shadow-md">
               <div className="w-2 h-2 bg-white rounded-full"></div>
             </div>
           </div>
@@ -46,7 +66,7 @@ const Login = ({ onLogin }) => {
         <div className="flex-1 flex flex-col items-center justify-center px-6 md:px-8">
           {/* Logo Section */}
           <div className="text-center mb-12">
-            <div className="w-20 h-20 bg-gradient-to-br from-blue-500 via-blue-600 to-purple-600 rounded-2xl flex items-center justify-center mb-8 mx-auto shadow-2xl">
+            <div className="w-20 h-20 bg-gradient-to-br from-gray-500 via-gray-600 to-gray-700 rounded-2xl flex items-center justify-center mb-8 mx-auto shadow-2xl">
               <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
               </svg>
@@ -65,9 +85,9 @@ const Login = ({ onLogin }) => {
                   Phone Number
                 </label>
                 <div className="relative">
-                  <div className="flex items-center bg-slate-800/50 backdrop-blur-sm border border-slate-600/50 rounded-xl px-4 py-4 shadow-lg hover:border-slate-500/50 transition-all duration-200">
+                  <div className="flex items-center bg-gray-800/50 backdrop-blur-sm border border-gray-600/50 rounded-xl px-4 py-4 shadow-lg hover:border-gray-500/50 transition-all duration-200">
                     <span className="text-white mr-3 font-medium">+91</span>
-                    <div className="w-px h-6 bg-slate-600 mr-3"></div>
+                    <div className="w-px h-6 bg-gray-600 mr-3"></div>
                     <input
                       type="tel"
                       value={phoneNumber}
@@ -77,7 +97,7 @@ const Login = ({ onLogin }) => {
                     />
                     <button
                       type="button"
-                      className="text-gray-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-700/50"
+                      className="text-gray-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-gray-700/50"
                     >
                       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
@@ -93,7 +113,7 @@ const Login = ({ onLogin }) => {
                   Password
                 </label>
                 <div className="relative">
-                  <div className="flex items-center bg-slate-800/50 backdrop-blur-sm border border-slate-600/50 rounded-xl px-4 py-4 shadow-lg hover:border-slate-500/50 transition-all duration-200">
+                  <div className="flex items-center bg-gray-800/50 backdrop-blur-sm border border-gray-600/50 rounded-xl px-4 py-4 shadow-lg hover:border-gray-500/50 transition-all duration-200">
                     <input
                       type={showPassword ? "text" : "password"}
                       value={password}
@@ -104,7 +124,7 @@ const Login = ({ onLogin }) => {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="text-gray-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-700/50"
+                      className="text-gray-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-gray-700/50"
                     >
                       {showPassword ? (
                         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -123,7 +143,7 @@ const Login = ({ onLogin }) => {
               {/* Sign In Button */}
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-blue-600 via-blue-700 to-purple-600 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center space-x-3 shadow-2xl hover:shadow-blue-500/25 hover:scale-[1.02] transition-all duration-200 border border-blue-500/20"
+                className="w-full bg-gradient-to-r from-gray-600 via-gray-700 to-gray-800 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center space-x-3 shadow-2xl hover:shadow-gray-500/25 hover:scale-[1.02] transition-all duration-200 border border-gray-500/20"
               >
                 <span className="text-lg tracking-wide">Sign In</span>
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -136,17 +156,17 @@ const Login = ({ onLogin }) => {
             <div className="mt-10 text-center space-y-5">
               <p className="text-white text-lg">
                 Don't have an account?{' '}
-                <a href="#" className="text-blue-400 hover:text-blue-300 transition-colors font-medium underline decoration-blue-400/50 hover:decoration-blue-300">
+                <a href="#" className="text-gray-400 hover:text-gray-300 transition-colors font-medium underline decoration-gray-400/50 hover:decoration-gray-300">
                   Sign Up
                 </a>
               </p>
               <p className="text-gray-400 text-sm leading-relaxed">
                 By signing in, you agree to our{' '}
-                <a href="#" className="text-blue-400 hover:text-blue-300 transition-colors underline decoration-blue-400/50 hover:decoration-blue-300">
+                <a href="#" className="text-gray-400 hover:text-gray-300 transition-colors underline decoration-gray-400/50 hover:decoration-gray-300">
                   Terms
                 </a>
                 {' '}and{' '}
-                <a href="#" className="text-blue-400 hover:text-blue-300 transition-colors underline decoration-blue-400/50 hover:decoration-blue-300">
+                <a href="#" className="text-gray-400 hover:text-gray-300 transition-colors underline decoration-gray-400/50 hover:decoration-gray-300">
                   Privacy Policy
                 </a>
               </p>
@@ -157,15 +177,15 @@ const Login = ({ onLogin }) => {
         {/* Bottom Features */}
         <div className="flex justify-center items-center space-x-12 py-10">
           <div className="flex items-center space-x-3">
-            <div className="w-4 h-4 bg-gradient-to-r from-blue-500 to-blue-400 rounded-full shadow-lg shadow-blue-500/30"></div>
+            <div className="w-4 h-4 bg-gradient-to-r from-gray-500 to-gray-400 rounded-full shadow-lg shadow-gray-500/30"></div>
             <span className="text-white text-sm font-medium tracking-wide">AI Powered</span>
           </div>
           <div className="flex items-center space-x-3">
-            <div className="w-4 h-4 bg-gradient-to-r from-green-500 to-green-400 rounded-full shadow-lg shadow-green-500/30"></div>
+            <div className="w-4 h-4 bg-gradient-to-r from-gray-500 to-gray-400 rounded-full shadow-lg shadow-gray-500/30"></div>
             <span className="text-white text-sm font-medium tracking-wide">Secure</span>
           </div>
           <div className="flex items-center space-x-3">
-            <div className="w-4 h-4 bg-gradient-to-r from-purple-500 to-purple-400 rounded-full shadow-lg shadow-purple-500/30"></div>
+            <div className="w-4 h-4 bg-gradient-to-r from-gray-500 to-gray-400 rounded-full shadow-lg shadow-gray-500/30"></div>
             <span className="text-white text-sm font-medium tracking-wide">Fast Trading</span>
           </div>
         </div>
