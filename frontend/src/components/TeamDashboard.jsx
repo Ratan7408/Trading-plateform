@@ -73,110 +73,78 @@ const TeamDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen text-white pb-20" style={{ backgroundColor: '#121818' }}>
+    <div className="min-h-screen text-white" style={{ backgroundColor: '#121818' }}>
       {/* Header */}
       <div className="p-6">
-        <div className="flex items-center space-x-3 mb-6">
-          <div className="w-8 h-8 bg-gradient-to-br from-teal-400 to-cyan-500 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">C</span>
-          </div>
-          <div>
-            <h1 className="text-white font-semibold text-lg">Team Network</h1>
-            <p className="text-gray-400 text-sm">Build Your Community</p>
-          </div>
-        </div>
+        <button 
+          onClick={() => navigate('/home')}
+          className="flex items-center text-white hover:text-gray-300 transition-colors mb-6"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        
+        <h1 className="text-white text-xl font-semibold mb-8">Team</h1>
 
-        {/* Stats Cards */}
-        <div className="flex space-x-4 mb-6">
-          <div className="flex-1 bg-gradient-to-br from-purple-500 to-blue-600 rounded-xl p-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                <span className="text-white text-lg">👥</span>
+        {/* Level1 Member */}
+        <div className="mb-8">
+          <button 
+            onClick={() => navigate('/team/1')}
+            className="w-full text-left"
+          >
+            <h2 className="text-white text-lg font-medium mb-4">Level1 Member</h2>
+            <div className="flex space-x-4">
+              <div className="flex-1 bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors">
+                <p className="text-white text-sm mb-2">Valid member</p>
+                <p className="text-white text-2xl font-bold text-center">0</p>
               </div>
-              <div>
-                <p className="text-white text-2xl font-bold">180</p>
-                <p className="text-white/80 text-sm">Total Members</p>
+              <div className="flex-1 bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors">
+                <p className="text-white text-sm mb-2">Total member</p>
+                <p className="text-white text-2xl font-bold text-center">0</p>
               </div>
             </div>
-          </div>
-          <div className="flex-1 bg-gradient-to-br from-green-500 to-blue-600 rounded-xl p-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                <span className="text-white text-lg">💰</span>
+          </button>
+        </div>
+
+        {/* Level2 Member */}
+        <div className="mb-8">
+          <button 
+            onClick={() => navigate('/team/2')}
+            className="w-full text-left"
+          >
+            <h2 className="text-white text-lg font-medium mb-4">Level2 Member</h2>
+            <div className="flex space-x-4">
+              <div className="flex-1 bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors">
+                <p className="text-white text-sm mb-2">Valid member</p>
+                <p className="text-white text-2xl font-bold text-center">0</p>
               </div>
-              <div>
-                <p className="text-white text-2xl font-bold">₹20600</p>
-                <p className="text-white/80 text-sm">Total Earned</p>
+              <div className="flex-1 bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors">
+                <p className="text-white text-sm mb-2">Total member</p>
+                <p className="text-white text-2xl font-bold text-center">0</p>
               </div>
             </div>
-          </div>
+          </button>
         </div>
 
-        {/* Referral Code */}
-        <div className="bg-gray-800/50 rounded-xl p-4 mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-white font-medium">Your Referral Code</h3>
-            <span className="text-gray-400">📤</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="bg-gray-700 rounded-lg px-4 py-3 flex-1 mr-3">
-              <p className="text-green-400 text-lg font-mono">VW8CQ05S</p>
+        {/* Level3 Member */}
+        <div className="mb-8">
+          <button 
+            onClick={() => navigate('/team/3')}
+            className="w-full text-left"
+          >
+            <h2 className="text-white text-lg font-medium mb-4">Level3 Member</h2>
+            <div className="flex space-x-4">
+              <div className="flex-1 bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors">
+                <p className="text-white text-sm mb-2">Valid member</p>
+                <p className="text-white text-2xl font-bold text-center">0</p>
+              </div>
+              <div className="flex-1 bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors">
+                <p className="text-white text-sm mb-2">Total member</p>
+                <p className="text-white text-2xl font-bold text-center">0</p>
+              </div>
             </div>
-            <button className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm mr-2 flex items-center space-x-1">
-              <span>📋</span>
-              <span>Copy</span>
-            </button>
-            <button className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-1">
-              <span>📤</span>
-              <span>Share</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Team Levels */}
-        <div className="mb-6">
-          <div className="flex items-center space-x-2 mb-4">
-            <span className="text-white font-medium">Team Levels</span>
-            <span className="text-gray-400">👑</span>
-          </div>
-          <div className="space-y-3">
-            {teamLevels.map((level) => (
-              <div key={level.level} className="bg-gray-800/50 rounded-xl p-4 flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className={`w-10 h-10 bg-gradient-to-br ${level.color} rounded-full flex items-center justify-center`}>
-                    <span className="text-white font-bold">{level.level}</span>
-                  </div>
-                  <div>
-                    <p className="text-white font-medium">Level {level.level}</p>
-                    <p className="text-gray-400 text-sm">{level.members} members ({level.active} active)</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-white font-medium">{level.commission} Commission</span>
-                  <span className="text-gray-400">→</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Recent Members */}
-        <div>
-          <div className="flex items-center space-x-2 mb-4">
-            <span className="text-white font-medium">Recent Members</span>
-            <span className="text-gray-400">👥</span>
-          </div>
-          <div className="space-y-3">
-            {recentMembers.map((member, index) => (
-              <div key={index} className="bg-gray-800/50 rounded-xl p-4 flex items-center justify-between">
-                <div>
-                  <p className="text-white font-medium">{member.id}</p>
-                  <p className="text-gray-400 text-sm">Level {member.level}</p>
-                </div>
-                <span className="text-green-400 text-sm">{member.status}</span>
-              </div>
-            ))}
-          </div>
+          </button>
         </div>
       </div>
 
@@ -189,14 +157,14 @@ const TeamDashboard = () => {
               onClick={() => handleTabClick(item.id)}
               className={`flex flex-col items-center py-2 px-3 rounded-lg transition-colors ${
                 activeTab === item.id 
-                  ? 'text-teal-400' 
+                  ? 'text-blue-400' 
                   : 'text-gray-400 hover:text-gray-300'
               }`}
             >
               <span className="text-xl mb-1">{item.icon}</span>
               <span className="text-xs font-medium">{item.label}</span>
               {activeTab === item.id && (
-                <div className="w-1 h-1 bg-teal-400 rounded-full mt-1"></div>
+                <div className="w-1 h-1 bg-blue-400 rounded-full mt-1"></div>
               )}
             </button>
           ))}

@@ -1,7 +1,8 @@
-const express = require('express');
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const auth = require('../middleware/auth');
+import express from 'express';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import User from '../models/User.js';
+import auth from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -111,4 +112,46 @@ router.get('/verify', auth, (req, res) => {
   res.json({ message: 'Token is valid', userId: req.userId });
 });
 
-module.exports = router;
+// Change password
+router.post('/change-password', auth, async (req, res) => {
+  try {
+    const { oldPassword, newPassword, confirmPassword } = req.body;
+
+    // Validate required fields
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    // Check if new password and confirm password match
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ message: 'New password and confirm password do not match' });
+    }
+
+    // Find user
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Verify old password
+    const isOldPasswordValid = await user.comparePassword(oldPassword);
+    if (!isOldPasswordValid) {
+      return res.status(400).json({ message: 'Old password is incorrect' });
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Update password
+    user.password = hashedPassword;
+    await user.save();
+
+    res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Error changing password:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+export default router;

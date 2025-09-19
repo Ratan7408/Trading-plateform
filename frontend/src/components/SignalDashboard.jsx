@@ -41,10 +41,10 @@ const SignalDashboard = () => {
         <div className="w-6 h-6"></div>
       </div>
 
-      {/* OWIN Logo */}
+      {/* Owin Logo */}
       <div className="flex justify-center my-8">
         <span className="text-4xl font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-          OWIN
+          Owin
         </span>
       </div>
 

@@ -1,8 +1,14 @@
-const express = require('express');
-const cors = require('cors');
-const mongoose = require('mongoose');
-const authRoutes = require('./routes/auth');
-require('dotenv').config();
+import express from 'express';
+import cors from 'cors';
+import mongoose from 'mongoose';
+import authRoutes from './routes/auth.js';
+import withdrawRoutes from './routes/withdraw.js';
+import orderRoutes from './routes/order.js';
+import rechargeRoutes from './routes/recharge.js';
+import bankRoutes from './routes/bank.js';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -12,13 +18,14 @@ app.use(cors());
 app.use(express.json());
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/trading-platform', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+mongoose.connect(process.env.MONGODB_URI);
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/withdraw', withdrawRoutes);
+app.use('/api/order', orderRoutes);
+app.use('/api/recharge', rechargeRoutes);
+app.use('/api/bank', bankRoutes);
 
 // Basic route
 app.get('/', (req, res) => {

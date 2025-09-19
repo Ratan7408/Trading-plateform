@@ -1,38 +1,70 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './components/Login'
+import Signup from './components/Signup'
 import HomeDashboard from './components/HomeDashboard'
 import SignalDashboard from './components/SignalDashboard'
 import MarketDashboard from './components/MarketDashboard'
 import TeamDashboard from './components/TeamDashboard'
+import TeamMemberDetail from './components/TeamMemberDetail'
 import InvestDashboard from './components/InvestDashboard'
 import Profile from './components/Profile'
+import WithdrawRecord from './components/WithdrawRecord'
+import OrderRecord from './components/OrderRecord'
+import RechargeRecord from './components/RechargeRecord'
+import BankSettings from './components/BankSettings'
+import PasswordSettings from './components/PasswordSettings'
 import './App.css'
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
 
+  // Check if user is already logged in on app load
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      setIsLoggedIn(true);
+    }
+  }, []);
+
   const handleLogin = () => {
     setIsLoggedIn(true)
   }
 
+  const handleSignup = () => {
+    setIsLoggedIn(true)
+  }
+
   const handleLogout = () => {
-    setIsLoggedIn(false)
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setIsLoggedIn(false);
+    // Force redirect to login page
+    window.location.href = '/';
   }
 
   return (
     <BrowserRouter>
       <Routes>
         {!isLoggedIn ? (
-          <Route path="/" element={<Login onLogin={handleLogin} />} />
+          <>
+            <Route path="/" element={<Login onLogin={handleLogin} />} />
+            <Route path="/signup" element={<Signup onSignup={handleSignup} />} />
+          </>
         ) : (
           <>
             <Route path="/" element={<Navigate to="/home" replace />} />
             <Route path="/home" element={<HomeDashboard />} />
             <Route path="/signal" element={<SignalDashboard />} />
             <Route path="/team" element={<TeamDashboard />} />
+            <Route path="/team/:level" element={<TeamMemberDetail />} />
             <Route path="/assets" element={<InvestDashboard />} />
             <Route path="/profile" element={<Profile onLogout={handleLogout} />} />
+            <Route path="/withdraw-record" element={<WithdrawRecord />} />
+            <Route path="/order-record" element={<OrderRecord />} />
+            <Route path="/recharge-record" element={<RechargeRecord />} />
+            <Route path="/bank-settings" element={<BankSettings />} />
+            <Route path="/password-settings" element={<PasswordSettings />} />
           </>
         )}
       </Routes>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { externalApi } from '../utils/api';
 
 const MarketDashboard = () => {
   const navigate = useNavigate();
@@ -56,8 +57,8 @@ const MarketDashboard = () => {
     // Initial data load
     const fetchInitialData = async () => {
       try {
-        const response = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=inr&order=market_cap_desc&per_page=50&page=1&sparkline=false');
-        const marketData = await response.json();
+        const response = await externalApi.get('https://api.coingecko.com/api/v3/coins/markets?vs_currency=inr&order=market_cap_desc&per_page=50&page=1&sparkline=false');
+        const marketData = response.data;
         
         const formattedData = marketData.map((coin, index) => ({
           id: coin.id,

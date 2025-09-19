@@ -14,31 +14,31 @@ const Profile = ({ onLogout }) => {
       id: 'order-record',
       icon: '📋',
       label: 'Order record',
-      action: () => console.log('Order record clicked')
+      action: () => navigate('/order-record')
     },
     {
       id: 'recharge-record',
       icon: '💰',
       label: 'Recharge record',
-      action: () => console.log('Recharge record clicked')
+      action: () => navigate('/recharge-record')
     },
     {
       id: 'withdraw-record',
       icon: '💸',
       label: 'Withdraw record',
-      action: () => console.log('Withdraw record clicked')
+      action: () => navigate('/withdraw-record')
     },
     {
       id: 'bank-settings',
       icon: '🏦',
       label: 'Bank settings',
-      action: () => console.log('Bank settings clicked')
+      action: () => navigate('/bank-settings')
     },
     {
       id: 'password-settings',
       icon: '🔒',
       label: 'Password settings',
-      action: () => console.log('Password settings clicked')
+      action: () => navigate('/password-settings')
     },
     {
       id: 'logout',
@@ -69,10 +69,10 @@ const Profile = ({ onLogout }) => {
 
         {/* Profile Section */}
         <div className="flex items-center space-x-4 mb-8">
-          {/* OWIN Logo */}
+          {/* Owin Logo */}
           <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
             <span className="text-2xl font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-              OWIN
+              Owin
             </span>
           </div>
 

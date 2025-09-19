@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import api from '../utils/api';
 
 const Login = ({ onLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -9,30 +11,22 @@ const Login = ({ onLogin }) => {
     e.preventDefault();
     
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: phoneNumber,
-          password: password,
-        }),
+      const response = await api.post('/auth/login', {
+        username: phoneNumber,
+        password: password,
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        // Store token in localStorage
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        onLogin();
-      } else {
-        alert(data.message || 'Login failed');
-      }
+      // Store token in localStorage
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      onLogin();
     } catch (error) {
       console.error('Login error:', error);
-      alert('Network error. Please try again.');
+      if (error.response) {
+        alert(error.response.data.message || 'Login failed');
+      } else {
+        alert('Network error. Please try again.');
+      }
     }
   };
 
@@ -53,7 +47,7 @@ const Login = ({ onLogin }) => {
         <div className="flex justify-between items-start p-6 md:p-8">
           <div className="text-left">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-2 tracking-tight">Hello</h1>
-            <p className="text-xl md:text-2xl text-gray-300 font-medium tracking-wide">Welcome to CORAL</p>
+            <p className="text-xl md:text-2xl text-gray-300 font-medium tracking-wide">Welcome to Owin</p>
           </div>
           <div className="w-12 h-12 bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl flex items-center justify-center shadow-lg">
             <div className="w-6 h-6 bg-gradient-to-br from-gray-400 to-gray-500 rounded-full flex items-center justify-center shadow-md">
@@ -71,7 +65,7 @@ const Login = ({ onLogin }) => {
                 <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
               </svg>
             </div>
-            <h2 className="text-5xl md:text-6xl font-bold text-white mb-3 tracking-tight">CORAL</h2>
+            <h2 className="text-5xl md:text-6xl font-bold text-white mb-3 tracking-tight">Owin</h2>
             <p className="text-lg md:text-xl text-gray-300 mb-3 tracking-widest font-light">TRADING PLATFORM</p>
             <p className="text-xl md:text-2xl text-white font-medium tracking-wide">AI Trading Platform</p>
           </div>
@@ -156,9 +150,9 @@ const Login = ({ onLogin }) => {
             <div className="mt-10 text-center space-y-5">
               <p className="text-white text-lg">
                 Don't have an account?{' '}
-                <a href="#" className="text-gray-400 hover:text-gray-300 transition-colors font-medium underline decoration-gray-400/50 hover:decoration-gray-300">
+                <Link to="/signup" className="text-gray-400 hover:text-gray-300 transition-colors font-medium underline decoration-gray-400/50 hover:decoration-gray-300">
                   Sign Up
-                </a>
+                </Link>
               </p>
               <p className="text-gray-400 text-sm leading-relaxed">
                 By signing in, you agree to our{' '}
@@ -177,15 +171,15 @@ const Login = ({ onLogin }) => {
         {/* Bottom Features */}
         <div className="flex justify-center items-center space-x-12 py-10">
           <div className="flex items-center space-x-3">
-            <div className="w-4 h-4 bg-gradient-to-r from-gray-500 to-gray-400 rounded-full shadow-lg shadow-gray-500/30"></div>
+            <div className="w-4 h-4 bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full shadow-lg shadow-blue-500/30"></div>
             <span className="text-white text-sm font-medium tracking-wide">AI Powered</span>
           </div>
           <div className="flex items-center space-x-3">
-            <div className="w-4 h-4 bg-gradient-to-r from-gray-500 to-gray-400 rounded-full shadow-lg shadow-gray-500/30"></div>
+            <div className="w-4 h-4 bg-gradient-to-r from-green-500 to-emerald-400 rounded-full shadow-lg shadow-green-500/30"></div>
             <span className="text-white text-sm font-medium tracking-wide">Secure</span>
           </div>
           <div className="flex items-center space-x-3">
-            <div className="w-4 h-4 bg-gradient-to-r from-gray-500 to-gray-400 rounded-full shadow-lg shadow-gray-500/30"></div>
+            <div className="w-4 h-4 bg-gradient-to-r from-purple-500 to-pink-400 rounded-full shadow-lg shadow-purple-500/30"></div>
             <span className="text-white text-sm font-medium tracking-wide">Fast Trading</span>
           </div>
         </div>
