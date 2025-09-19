@@ -6,6 +6,7 @@ import withdrawRoutes from './routes/withdraw.js';
 import orderRoutes from './routes/order.js';
 import rechargeRoutes from './routes/recharge.js';
 import bankRoutes from './routes/bank.js';
+import adminRoutes from './routes/admin.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -26,6 +27,7 @@ app.use('/api/withdraw', withdrawRoutes);
 app.use('/api/order', orderRoutes);
 app.use('/api/recharge', rechargeRoutes);
 app.use('/api/bank', bankRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Basic route
 app.get('/', (req, res) => {

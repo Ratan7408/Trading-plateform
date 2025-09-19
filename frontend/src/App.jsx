@@ -14,6 +14,9 @@ import OrderRecord from './components/OrderRecord'
 import RechargeRecord from './components/RechargeRecord'
 import BankSettings from './components/BankSettings'
 import PasswordSettings from './components/PasswordSettings'
+import AdminLogin from './components/AdminLogin'
+import AdminDashboard from './components/AdminDashboard'
+import TradingPage from './components/TradingPage'
 import './App.css'
 
 function App() {
@@ -65,8 +68,11 @@ function App() {
             <Route path="/recharge-record" element={<RechargeRecord />} />
             <Route path="/bank-settings" element={<BankSettings />} />
             <Route path="/password-settings" element={<PasswordSettings />} />
+            <Route path="/trading/*" element={<TradingPage />} />
           </>
         )}
+        <Route path="/admin-login" element={<AdminLogin />} />
+        <Route path="/admin-dashboard" element={<AdminDashboard />} />
       </Routes>
     </BrowserRouter>
   )

@@ -66,7 +66,7 @@ const HomeDashboard = () => {
           'tron', 'cardano', 'polkadot', 'binancecoin'
         ];
         
-        const response = await externalApi.get(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usdt&ids=${coinIds.join(',')}&order=market_cap_desc&per_page=20&page=1&sparkline=false`);
+        const response = await externalApi.get(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${coinIds.join(',')}&order=market_cap_desc&per_page=20&page=1&sparkline=false`);
         const marketData = response.data;
         
         const formattedData = marketData.map((coin) => ({
@@ -225,7 +225,11 @@ const HomeDashboard = () => {
           {/* Crypto Rows */}
           <div className="divide-y divide-gray-700/30">
             {cryptoData.map((crypto, index) => (
-              <div key={crypto.id || index} className="flex items-center px-4 py-3 hover:bg-gray-700/20 transition-colors">
+              <div 
+                key={crypto.id || index} 
+                className="flex items-center px-4 py-3 hover:bg-gray-700/20 transition-colors cursor-pointer"
+                onClick={() => navigate(`/trading/${crypto.name}`)}
+              >
                 <div className="flex-1 flex items-center space-x-3">
                   <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center overflow-hidden">
                     <img 
