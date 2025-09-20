@@ -12,7 +12,7 @@ const OrderRecord = () => {
     const fetchOrderData = async () => {
       try {
         const response = await api.get('/order/records');
-        setOrderData(response.data);
+        setOrderData(response.data.orders || []);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching order data:', error);
@@ -49,26 +49,78 @@ const OrderRecord = () => {
           /* Order Records List */
           <div className="space-y-4">
             {orderData.map((order, index) => (
-              <div key={index} className="bg-gray-800 rounded-lg p-4">
-                <div className="flex justify-between items-start mb-2">
+              <div key={order.id || index} className="bg-gray-800 rounded-lg p-4">
+                <div className="flex justify-between items-start mb-3">
                   <div>
                     <p className="text-white font-medium">{order.symbol}</p>
                     <p className="text-gray-400 text-sm">{new Date(order.createdAt).toLocaleDateString()}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-white font-bold">${order.amount}</p>
-                    <p className={`text-sm ${
+                    <p className="text-white font-bold">₹{order.amount.toLocaleString()}</p>
+                    <p className={`text-sm font-medium ${
                       order.status === 'completed' ? 'text-green-400' : 
+                      order.status === 'active' ? 'text-blue-400' :
                       order.status === 'pending' ? 'text-yellow-400' : 'text-red-400'
                     }`}>
-                      {order.status}
+                      {order.status.toUpperCase()}
                     </p>
                   </div>
                 </div>
-                <div className="text-gray-400 text-sm">
-                  <p>Type: {order.type}</p>
-                  <p>Price: ${order.price}</p>
+                
+                <div className="grid grid-cols-2 gap-4 text-sm mb-3">
+                  <div>
+                    <p className="text-gray-400">Type:</p>
+                    <p className={`font-medium ${
+                      order.type === 'Call' ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {order.type}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Entry Price:</p>
+                    <p className="text-white">${order.entryPrice?.toFixed(4) || 'N/A'}</p>
+                  </div>
+                  {order.exitPrice && (
+                    <>
+                      <div>
+                        <p className="text-gray-400">Exit Price:</p>
+                        <p className="text-white">${order.exitPrice.toFixed(4)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400">P&L:</p>
+                        <p className={`font-medium ${
+                          order.profitLoss >= 0 ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {order.profitLoss >= 0 ? '+' : ''}₹{order.profitLoss?.toFixed(2) || '0.00'}
+                        </p>
+                      </div>
+                    </>
+                  )}
                 </div>
+                
+                {order.followedSignal !== undefined && (
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-gray-400">Signal:</span>
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        order.followedSignal ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        {order.followedSignal ? '✓ Followed' : '✗ Not Followed'}
+                      </span>
+                    </div>
+                    <div className="text-gray-400">
+                      Admin: {order.adminSignal}
+                    </div>
+                  </div>
+                )}
+                
+                {order.status === 'completed' && order.isWin !== null && (
+                  <div className={`mt-2 text-center text-sm font-medium ${
+                    order.isWin ? 'text-green-400' : 'text-red-400'
+                  }`}>
+                    {order.isWin ? '🎉 WIN' : '📉 LOSS'}
+                  </div>
+                )}
               </div>
             ))}
           </div>

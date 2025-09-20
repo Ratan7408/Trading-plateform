@@ -12,7 +12,7 @@ const TradingPage = () => {
   const [loading, setLoading] = useState(true);
   const [selectedTimeframe, setSelectedTimeframe] = useState('15m');
   const [activeTraders, setActiveTraders] = useState(12500);
-  const [userBalance, setUserBalance] = useState(1200); // Demo balance
+  const [userBalance, setUserBalance] = useState(0); // Will be fetched from backend
   const [hasTradeToday, setHasTradeToday] = useState(false);
   const [adminSignal, setAdminSignal] = useState('Call'); // Current admin signal
   const [tradeAmount, setTradeAmount] = useState('');
@@ -112,33 +112,38 @@ const TradingPage = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Check if user has traded today
+  // Fetch user balance and check if user has traded today
   useEffect(() => {
-    const checkTodayTrade = async () => {
+    const fetchUserData = async () => {
       try {
-        const response = await api.get('/user/today-trade-status');
-        setHasTradeToday(response.data.hasTradeToday);
+        // Fetch user balance
+        const balanceResponse = await api.get('/auth/user/balance');
+        setUserBalance(balanceResponse.data.balance);
+
+        // Check if user has traded today
+        const tradeResponse = await api.get('/trade/can-trade-today');
+        setHasTradeToday(tradeResponse.data.hasTradeToday);
       } catch (error) {
-        console.error('Error checking today trade status:', error);
+        console.error('Error fetching user data:', error);
       }
     };
 
-    checkTodayTrade();
+    fetchUserData();
   }, []);
 
   // Fetch current admin signal
   useEffect(() => {
     const fetchAdminSignal = async () => {
       try {
-        const response = await api.get('/admin/current-signal');
-        setAdminSignal(response.data.signal || 'Call');
+        const response = await api.get(`/trade/signal/${symbol.replace('/', '')}`);
+        setAdminSignal(response.data.signalType || 'Call');
       } catch (error) {
         console.error('Error fetching admin signal:', error);
       }
     };
 
     fetchAdminSignal();
-  }, []);
+  }, [symbol]);
 
   // Trading functions
   const handleTrade = async (signal) => {
@@ -163,32 +168,35 @@ const TradingPage = () => {
     setTradingLoading(true);
 
     try {
-      const response = await api.post('/user/place-trade', {
+      const response = await api.post('/trade/place', {
         symbol: symbol,
-        signal: signal,
-        amount: amount,
-        adminSignal: adminSignal
+        tradeType: signal,
+        amount: amount
       });
 
       const result = response.data;
       
       if (result.success) {
-        // Calculate result based on signal following
-        const followedSignal = signal === adminSignal;
-        let profitLoss;
+        alert(`Trade placed successfully!`);
         
-        if (followedSignal) {
-          profitLoss = amount * 0.06; // 6% profit
-          alert(`Trade successful! You followed the admin signal and earned ₹${profitLoss.toFixed(2)} profit!`);
-        } else {
-          profitLoss = -amount * 0.30; // 30% penalty
-          alert(`Trade placed but you didn't follow the admin signal (${adminSignal}). ₹${Math.abs(profitLoss).toFixed(2)} penalty applied.`);
-        }
-
-        // Update user balance
-        setUserBalance(prev => prev - amount + profitLoss);
+        // Update user balance immediately (amount deducted)
+        setUserBalance(result.userBalance);
         setHasTradeToday(true);
         setTradeAmount('');
+        
+        // Show trade details
+        console.log('Trade details:', result.trade);
+        
+        // Refresh balance after 6 seconds (after trade completes)
+        setTimeout(async () => {
+          try {
+            const balanceResponse = await api.get('/auth/user/balance');
+            setUserBalance(balanceResponse.data.balance);
+            alert('Trade completed! Check your balance and order history.');
+          } catch (error) {
+            console.error('Error refreshing balance:', error);
+          }
+        }, 6000);
       }
     } catch (error) {
       console.error('Error placing trade:', error);

@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import AdminSettings from '../models/AdminSettings.js';
+import Trade from '../models/Trade.js';
+import Signal from '../models/Signal.js';
 import auth from '../middleware/auth.js';
 
 const router = express.Router();
@@ -158,19 +160,22 @@ router.post('/change-password', auth, async (req, res) => {
 // Check if user has traded today
 router.get('/user/today-trade-status', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
+    const userId = req.userId;
+    
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const hasTradeToday = user.trades.some(trade => 
-      trade.date >= today
-    );
+    const todayTrade = await Trade.findOne({
+      userId: userId,
+      createdAt: { $gte: today, $lt: tomorrow }
+    });
 
-    res.json({ hasTradeToday });
+    res.json({ 
+      hasTradeToday: !!todayTrade,
+      todayTrade: todayTrade || null
+    });
   } catch (error) {
     console.error('Error checking today trade status:', error);
     res.status(500).json({ message: 'Server error' });
@@ -267,6 +272,68 @@ router.get('/user/balance', auth, async (req, res) => {
     res.json({ balance: user.balance });
   } catch (error) {
     console.error('Error fetching user balance:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get current admin signal
+router.get('/admin/current-signal', auth, async (req, res) => {
+  try {
+    const latestSignal = await Signal.getLatestSignal();
+    
+    if (!latestSignal) {
+      // Create a default signal if none exists
+      const adminUser = await User.findOne({ username: 'admin' });
+      const adminId = adminUser ? adminUser._id : req.userId;
+      
+      const defaultSignal = new Signal({
+        symbol: 'BTCUSDT',
+        signalType: Math.random() > 0.5 ? 'Call' : 'Put',
+        confidence: Math.floor(Math.random() * 30) + 70,
+        targetPrice: Math.random() * 50000 + 30000,
+        currentPrice: Math.random() * 50000 + 30000,
+        timeframe: '15m',
+        analysis: 'Automated signal for testing',
+        createdBy: adminId,
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000) // 15 minutes from now
+      });
+      
+      await defaultSignal.save();
+      return res.json({ signal: defaultSignal.signalType });
+    }
+    
+    res.json({ signal: latestSignal.signalType });
+  } catch (error) {
+    console.error('Error fetching admin signal:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get user profile with trading stats
+router.get('/user/profile', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Get trading statistics
+    const stats = await Trade.getUserStats(req.userId);
+    
+    res.json({
+      user: {
+        id: user._id,
+        username: user.username,
+        phone: user.phone,
+        vipLevel: user.vipLevel,
+        inviteCode: user.inviteCode,
+        balance: user.balance,
+        createdAt: user.createdAt
+      },
+      tradingStats: stats
+    });
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

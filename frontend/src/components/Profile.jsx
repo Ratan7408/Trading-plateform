@@ -4,29 +4,44 @@ import api from '../utils/api';
 
 const Profile = ({ onLogout }) => {
   const navigate = useNavigate();
-  const [userInfo] = useState({
-    phone: '8810884747',
+  const [userInfo, setUserInfo] = useState({
+    phone: 'Loading...',
     vipLevel: 'VIP0',
-    inviteCode: '567014'
+    inviteCode: 'Loading...'
   });
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Fetch user balance
+  // Fetch user data from User model
   useEffect(() => {
-    const fetchBalance = async () => {
+    const fetchUserData = async () => {
       try {
-        const response = await api.get('/user/balance');
-        setBalance(response.data.balance);
+        // Fetch complete user profile with balance
+        const response = await api.get('/auth/user/profile');
+        const userData = response.data.user;
+        
+        setUserInfo({
+          phone: userData.phone, // Use username as phone display
+          vipLevel: 'VIP0', // Keep VIP0 as default
+          inviteCode: userData.inviteCode
+        });
+        setBalance(userData.balance);
       } catch (error) {
-        console.error('Error fetching balance:', error);
-        setBalance(1200); // Demo balance fallback
+        console.error('Error fetching user data:', error);
+        // Fallback to just balance if profile fails
+        try {
+          const balanceResponse = await api.get('/auth/user/balance');
+          setBalance(balanceResponse.data.balance);
+        } catch (balanceError) {
+          console.error('Error fetching balance:', balanceError);
+          setBalance(1000); // Default balance from User model
+        }
       } finally {
         setLoading(false);
       }
     };
 
-    fetchBalance();
+    fetchUserData();
   }, []);
 
   const menuItems = [
