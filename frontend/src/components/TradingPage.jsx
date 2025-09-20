@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { externalApi } from '../utils/api';
-import { ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import api from '../utils/api';
+import CryptoChart from './CryptoChart';
 
 const TradingPage = () => {
   const navigate = useNavigate();
@@ -10,8 +11,12 @@ const TradingPage = () => {
   const [cryptoData, setCryptoData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedTimeframe, setSelectedTimeframe] = useState('15m');
-  const [chartData, setChartData] = useState([]);
   const [activeTraders, setActiveTraders] = useState(12500);
+  const [userBalance, setUserBalance] = useState(1200); // Demo balance
+  const [hasTradeToday, setHasTradeToday] = useState(false);
+  const [adminSignal, setAdminSignal] = useState('Call'); // Current admin signal
+  const [tradeAmount, setTradeAmount] = useState('');
+  const [tradingLoading, setTradingLoading] = useState(false);
 
   const timeframes = ['1m', '5m', '15m', '1h', '4h', '1d'];
 
@@ -40,7 +45,7 @@ const TradingPage = () => {
         const coinId = coinMap[symbol] || 'bitcoin';
         const response = await externalApi.get(`https://api.coingecko.com/api/v3/coins/${coinId}`);
         const data = response.data;
-        
+
         setCryptoData({
           name: data.name,
           symbol: data.symbol.toUpperCase(),
@@ -52,8 +57,6 @@ const TradingPage = () => {
           image: data.image.small
         });
 
-        // Generate mock chart data
-        generateChartData(data.market_data.current_price.usd);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching crypto data:', error);
@@ -68,88 +71,12 @@ const TradingPage = () => {
           rank: 7162,
           image: 'https://assets.coingecko.com/coins/images/5/large/dogecoin.png'
         });
-        generateChartData(0.276971);
         setLoading(false);
       }
     };
 
     fetchCryptoData();
   }, [symbol]);
-
-  const generateChartData = (currentPrice, timeframe = '15m') => {
-    const data = [];
-    const basePrice = currentPrice || 0.276971; // Fallback price
-    let lastPrice = basePrice;
-    
-    // Define timeframe intervals in milliseconds
-    const timeframeIntervals = {
-      '1m': 60000,      // 1 minute
-      '5m': 300000,     // 5 minutes
-      '15m': 900000,    // 15 minutes
-      '1h': 3600000,    // 1 hour
-      '4h': 14400000,   // 4 hours
-      '1d': 86400000    // 1 day
-    };
-    
-    const interval = timeframeIntervals[timeframe] || 900000;
-    const dataPoints = timeframe === '1d' ? 30 : 50; // Fewer points for daily view
-    
-    for (let i = 0; i < dataPoints; i++) {
-      const time = new Date(Date.now() - (dataPoints - 1 - i) * interval).toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        ...(timeframe === '1d' && { month: 'short', day: 'numeric' })
-      });
-      
-      // Create realistic price movements based on timeframe
-      const volatility = timeframe === '1m' ? 0.02 : 
-                        timeframe === '5m' ? 0.03 : 
-                        timeframe === '15m' ? 0.04 : 
-                        timeframe === '1h' ? 0.06 : 
-                        timeframe === '4h' ? 0.08 : 0.12; // Daily has more volatility
-      
-      const trend = (Math.random() - 0.5) * volatility;
-      const price = lastPrice * (1 + trend);
-      
-      // Allow for reasonable price swings
-      const finalPrice = Math.max(price, basePrice * 0.5);
-      
-      // Determine if price went up or down
-      const isUp = finalPrice > lastPrice;
-      lastPrice = finalPrice;
-      
-      data.push({
-        time,
-        price: finalPrice,
-        high: finalPrice * (1 + Math.random() * 0.03),
-        low: finalPrice * (1 - Math.random() * 0.03),
-        open: i === 0 ? finalPrice : data[i-1].price,
-        close: finalPrice,
-        isUp: isUp
-      });
-    }
-    
-    setChartData(data);
-  };
-
-  // Initialize chart data immediately
-  useEffect(() => {
-    generateChartData(0.276971);
-  }, []);
-
-  // Update chart when crypto data changes
-  useEffect(() => {
-    if (cryptoData && cryptoData.currentPrice) {
-      generateChartData(cryptoData.currentPrice, selectedTimeframe);
-    }
-  }, [cryptoData?.id]);
-
-  // Update chart when timeframe changes
-  useEffect(() => {
-    if (cryptoData && cryptoData.currentPrice) {
-      generateChartData(cryptoData.currentPrice, selectedTimeframe);
-    }
-  }, [selectedTimeframe]);
 
   // Live price updates
   useEffect(() => {
@@ -159,35 +86,12 @@ const TradingPage = () => {
       const variation = (Math.random() - 0.5) * 0.001; // ±0.1% variation
       const newPrice = cryptoData.currentPrice * (1 + variation);
       const newChange = cryptoData.priceChange24h + (Math.random() - 0.5) * 0.1;
-      
+
       setCryptoData(prev => ({
         ...prev,
         currentPrice: newPrice,
         priceChange24h: newChange
       }));
-
-      // Only update the latest bar, don't regenerate all data
-      setChartData(prev => {
-        const newData = [...prev];
-        const lastIndex = newData.length - 1;
-        const previousPrice = newData[lastIndex - 1]?.price || newData[lastIndex].price;
-        
-        // Update the last bar with new price and color
-        newData[lastIndex] = {
-          ...newData[lastIndex],
-          price: newPrice,
-          isUp: newPrice > previousPrice,
-          time: new Date().toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          }),
-          high: newPrice * (1 + Math.random() * 0.03),
-          low: newPrice * (1 - Math.random() * 0.03),
-          close: newPrice
-        };
-        
-        return newData;
-      });
     };
 
     const interval = setInterval(updatePrice, 3000); // Update every 3 seconds
@@ -207,6 +111,92 @@ const TradingPage = () => {
     const interval = setInterval(updateActiveTraders, 5000); // Update every 5 seconds
     return () => clearInterval(interval);
   }, []);
+
+  // Check if user has traded today
+  useEffect(() => {
+    const checkTodayTrade = async () => {
+      try {
+        const response = await api.get('/user/today-trade-status');
+        setHasTradeToday(response.data.hasTradeToday);
+      } catch (error) {
+        console.error('Error checking today trade status:', error);
+      }
+    };
+
+    checkTodayTrade();
+  }, []);
+
+  // Fetch current admin signal
+  useEffect(() => {
+    const fetchAdminSignal = async () => {
+      try {
+        const response = await api.get('/admin/current-signal');
+        setAdminSignal(response.data.signal || 'Call');
+      } catch (error) {
+        console.error('Error fetching admin signal:', error);
+      }
+    };
+
+    fetchAdminSignal();
+  }, []);
+
+  // Trading functions
+  const handleTrade = async (signal) => {
+    const amount = parseFloat(tradeAmount);
+
+    // Validation checks
+    if (!amount || amount < 600) {
+      alert('Minimum trade amount is ₹600');
+      return;
+    }
+
+    if (amount > userBalance) {
+      alert('Insufficient balance');
+      return;
+    }
+
+    if (hasTradeToday) {
+      alert('You can only trade once per day');
+      return;
+    }
+
+    setTradingLoading(true);
+
+    try {
+      const response = await api.post('/user/place-trade', {
+        symbol: symbol,
+        signal: signal,
+        amount: amount,
+        adminSignal: adminSignal
+      });
+
+      const result = response.data;
+      
+      if (result.success) {
+        // Calculate result based on signal following
+        const followedSignal = signal === adminSignal;
+        let profitLoss;
+        
+        if (followedSignal) {
+          profitLoss = amount * 0.06; // 6% profit
+          alert(`Trade successful! You followed the admin signal and earned ₹${profitLoss.toFixed(2)} profit!`);
+        } else {
+          profitLoss = -amount * 0.30; // 30% penalty
+          alert(`Trade placed but you didn't follow the admin signal (${adminSignal}). ₹${Math.abs(profitLoss).toFixed(2)} penalty applied.`);
+        }
+
+        // Update user balance
+        setUserBalance(prev => prev - amount + profitLoss);
+        setHasTradeToday(true);
+        setTradeAmount('');
+      }
+    } catch (error) {
+      console.error('Error placing trade:', error);
+      alert(error.response?.data?.message || 'Error placing trade. Please try again.');
+    } finally {
+      setTradingLoading(false);
+    }
+  };
 
   const handleBuy = () => {
     console.log('BUY order placed for', symbol);
@@ -239,7 +229,7 @@ const TradingPage = () => {
       {/* Header */}
       <div className="p-4 flex items-center justify-between border-b border-gray-700">
         <div className="flex items-center space-x-3">
-          <button 
+          <button
             onClick={() => navigate('/home')}
             className="text-white hover:text-gray-300 transition-colors"
           >
@@ -247,20 +237,23 @@ const TradingPage = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          
+
           <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
             <img src={cryptoData.image} alt={cryptoData.name} className="w-6 h-6" />
           </div>
-          
+
           <div>
             <h1 className="text-white font-semibold">{cryptoData.name}</h1>
             <p className="text-gray-400 text-sm">#{cryptoData.rank}</p>
           </div>
         </div>
-        
+
         <div className="text-right">
           <p className="text-gray-400 text-sm">Balance</p>
-          <p className="text-white font-semibold">₹0</p>
+          <p className="text-white font-semibold">₹{userBalance.toLocaleString()}</p>
+          {hasTradeToday && (
+            <p className="text-yellow-400 text-xs">Traded today</p>
+          )}
         </div>
       </div>
 
@@ -271,11 +264,10 @@ const TradingPage = () => {
             <button
               key={timeframe}
               onClick={() => setSelectedTimeframe(timeframe)}
-              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                selectedTimeframe === timeframe
+              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${selectedTimeframe === timeframe
                   ? 'bg-blue-500 text-white'
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
+                }`}
             >
               {timeframe}
             </button>
@@ -296,46 +288,33 @@ const TradingPage = () => {
               </p>
             </div>
           </div>
-          
-          {/* Recharts Bar Chart */}
-          <div className="h-64 bg-gray-900 rounded-lg p-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={chartData.slice(-20)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis 
-                  dataKey="time" 
-                  stroke="#9CA3AF"
-                  fontSize={12}
-                  tick={{ fill: '#9CA3AF' }}
-                />
-                <YAxis 
-                  stroke="#FFFFFF"
-                  fontSize={12}
-                  tick={{ fill: '#FFFFFF', fontSize: 12 }}
-                  axisLine={{ stroke: '#FFFFFF' }}
-                  domain={['dataMin - 0.01', 'dataMax + 0.01']}
-                  tickFormatter={(value) => `$${value.toFixed(2)}`}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#1F2937', 
-                    border: '1px solid #374151',
-                    borderRadius: '8px',
-                    color: '#FFFFFF'
-                  }}
-                  labelStyle={{ color: '#FFFFFF' }}
-                  formatter={(value, name) => [`$${value.toFixed(6)}`, 'Price']}
-                />
-                <Bar 
-                  dataKey="price" 
-                  radius={[2, 2, 0, 0]}
-                >
-                  {chartData.slice(-20).map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.isUp ? '#10B981' : '#EF4444'} />
-                  ))}
-                </Bar>
-              </ComposedChart>
-            </ResponsiveContainer>
+
+          {/* Professional Crypto Chart */}
+          <div className="bg-gray-900 rounded-lg overflow-hidden">
+            <CryptoChart 
+              symbol={(() => {
+                // Map all supported cryptocurrencies to Binance symbols
+                const symbolMap = {
+                  'BTC/USDT': 'BTCUSDT',
+                  'ETH/USDT': 'ETHUSDT',
+                  'DOGE/USDT': 'DOGEUSDT',
+                  'BCH/USDT': 'BCHUSDT',
+                  'LTC/USDT': 'LTCUSDT',
+                  'IOTA/USDT': 'IOTAUSDT',
+                  'FIL/USDT': 'FILUSDT',
+                  'FLOW/USDT': 'FLOWUSDT',
+                  'JST/USDT': 'JSTUSDT',
+                  'ETC/USDT': 'ETCUSDT',
+                  'TRX/USDT': 'TRXUSDT',
+                  'ADA/USDT': 'ADAUSDT',
+                  'DOT/USDT': 'DOTUSDT',
+                  'BNB/USDT': 'BNBUSDT'
+                };
+                return symbolMap[symbol] || 'BTCUSDT';
+              })()} 
+              interval={selectedTimeframe}
+              limit={100}
+            />
           </div>
         </div>
 
@@ -351,7 +330,7 @@ const TradingPage = () => {
               {cryptoData.priceChange24h >= 0 ? '+' : ''}{cryptoData.priceChange24h.toFixed(2)}%
             </p>
           </div>
-          
+
           <div className="bg-gray-800 rounded-lg p-4">
             <div className="flex items-center space-x-2 mb-2">
               <div className="w-4 h-4 bg-green-500 rounded-full"></div>
@@ -384,28 +363,69 @@ const TradingPage = () => {
           </div>
         </div>
 
+        {/* Trade Amount Input */}
+        <div className="mb-6">
+          <label className="text-white text-sm mb-2 block">Trade Amount (₹)</label>
+          <input
+            type="number"
+            value={tradeAmount}
+            onChange={(e) => setTradeAmount(e.target.value)}
+            onWheel={(e) => e.target.blur()} // Prevent scroll wheel from changing value
+            placeholder="Minimum ₹600"
+            min="600"
+            max={userBalance}
+            className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-blue-400 focus:outline-none transition-colors"
+            disabled={hasTradeToday}
+          />
+          <div className="flex justify-between text-xs mt-1">
+            <span className="text-gray-400">Minimum: ₹600</span>
+            <span className="text-gray-400">Available: ₹{userBalance.toLocaleString()}</span>
+          </div>
+        </div>
+
         {/* Trading Buttons */}
         <div className="text-center">
-          <h3 className="text-white font-semibold mb-4">Start Trading</h3>
-          <div className="flex space-x-4">
-            <button
-              onClick={handleBuy}
-              className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-4 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2"
-            >
-              <div className="w-4 h-4 bg-white rounded-full"></div>
-              <span>BUY</span>
-              <span className="text-sm">Price will rise</span>
-            </button>
-            
-            <button
-              onClick={handlePut}
-              className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-4 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2"
-            >
-              <div className="w-4 h-4 bg-white rounded-full"></div>
-              <span>PUT</span>
-              <span className="text-sm">Price will fall</span>
-            </button>
-          </div>
+          <h3 className="text-white font-semibold mb-4">
+            {hasTradeToday ? 'Trading Complete for Today' : 'Start Trading'}
+          </h3>
+          
+          {hasTradeToday ? (
+            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+              <p className="text-yellow-400 font-medium">You have already traded today</p>
+              <p className="text-gray-400 text-sm mt-1">Come back tomorrow to trade again</p>
+            </div>
+          ) : (
+            <>
+              <div className="flex space-x-4 mb-4">
+                <button
+                  onClick={() => handleTrade('Call')}
+                  disabled={tradingLoading || !tradeAmount || parseFloat(tradeAmount) < 600}
+                  className={`flex-1 font-semibold py-4 px-6 rounded-lg transition-colors flex flex-col items-center justify-center space-y-1 bg-green-500 hover:bg-green-600 text-white`}
+                >
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 bg-white rounded-full"></div>
+                    <span>CALL</span>
+                  </div>
+                  <span className="text-xs">Price will rise</span>
+                </button>
+                
+                <button
+                  onClick={() => handleTrade('Put')}
+                  disabled={tradingLoading || !tradeAmount || parseFloat(tradeAmount) < 600}
+                  className={`flex-1 font-semibold py-4 px-6 rounded-lg transition-colors flex flex-col items-center justify-center space-y-1 bg-red-500 hover:bg-red-600 text-white`}
+                >
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 bg-white rounded-full"></div>
+                    <span>PUT</span>
+                  </div>
+                  <span className="text-xs">Price will fall</span>
+                  {adminSignal === 'Put' && (
+                    <span className="text-xs bg-white/20 px-2 py-1 rounded">📉 Admin Signal</span>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

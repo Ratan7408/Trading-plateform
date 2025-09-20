@@ -28,6 +28,26 @@ const userSchema = new mongoose.Schema({
     type: String,
     unique: true
   },
+  balance: {
+    type: Number,
+    default: 1000 // Starting balance ₹1000
+  },
+  trades: [{
+    symbol: String,
+    signal: String,
+    amount: Number,
+    adminSignal: String,
+    followedSignal: Boolean,
+    profitLoss: Number,
+    date: {
+      type: Date,
+      default: Date.now
+    },
+    status: {
+      type: String,
+      default: 'pending'
+    }
+  }],
   createdAt: {
     type: Date,
     default: Date.now

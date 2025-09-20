@@ -2,6 +2,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
+import AdminSettings from '../models/AdminSettings.js';
 import auth from '../middleware/auth.js';
 
 const router = express.Router();
@@ -150,6 +151,122 @@ router.post('/change-password', auth, async (req, res) => {
     res.json({ message: 'Password changed successfully' });
   } catch (error) {
     console.error('Error changing password:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Check if user has traded today
+router.get('/user/today-trade-status', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const hasTradeToday = user.trades.some(trade => 
+      trade.date >= today
+    );
+
+    res.json({ hasTradeToday });
+  } catch (error) {
+    console.error('Error checking today trade status:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Place a trade
+router.post('/user/place-trade', auth, async (req, res) => {
+  try {
+    const { symbol, signal, amount, adminSignal } = req.body;
+    
+    // Validation
+    if (!symbol || !signal || !amount) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    if (amount < 600) {
+      return res.status(400).json({ message: 'Minimum trade amount is ₹600' });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if user has sufficient balance
+    if (user.balance < amount) {
+      return res.status(400).json({ message: 'Insufficient balance' });
+    }
+
+    // Check if user has already traded today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const hasTradeToday = user.trades.some(trade => 
+      trade.date >= today
+    );
+
+    if (hasTradeToday) {
+      return res.status(400).json({ message: 'You can only trade once per day' });
+    }
+
+    // Calculate profit/penalty based on signal following
+    const followedSignal = signal === adminSignal;
+    let profitLoss;
+    let resultMessage;
+
+    if (followedSignal) {
+      profitLoss = amount * 0.06; // 6% profit
+      resultMessage = `Trade successful! You followed the admin signal and earned ₹${profitLoss.toFixed(2)} profit!`;
+    } else {
+      profitLoss = -amount * 0.30; // 30% penalty
+      resultMessage = `Trade placed but you didn't follow the admin signal (${adminSignal}). ₹${Math.abs(profitLoss).toFixed(2)} penalty applied.`;
+    }
+
+    // Deduct trade amount and add/subtract profit/penalty
+    user.balance = user.balance - amount + profitLoss;
+
+    // Add trade to user's trade history
+    user.trades.push({
+      symbol,
+      signal,
+      amount,
+      adminSignal,
+      followedSignal,
+      profitLoss,
+      date: new Date(),
+      status: 'completed'
+    });
+
+    await user.save();
+
+    res.json({ 
+      success: true,
+      message: resultMessage,
+      newBalance: user.balance,
+      profitLoss,
+      followedSignal
+    });
+  } catch (error) {
+    console.error('Error placing trade:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get user balance
+router.get('/user/balance', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('balance');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ balance: user.balance });
+  } catch (error) {
+    console.error('Error fetching user balance:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../utils/api';
 
 const Profile = ({ onLogout }) => {
   const navigate = useNavigate();
@@ -8,6 +9,25 @@ const Profile = ({ onLogout }) => {
     vipLevel: 'VIP0',
     inviteCode: '567014'
   });
+  const [balance, setBalance] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch user balance
+  useEffect(() => {
+    const fetchBalance = async () => {
+      try {
+        const response = await api.get('/user/balance');
+        setBalance(response.data.balance);
+      } catch (error) {
+        console.error('Error fetching balance:', error);
+        setBalance(1200); // Demo balance fallback
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBalance();
+  }, []);
 
   const menuItems = [
     {
@@ -83,6 +103,15 @@ const Profile = ({ onLogout }) => {
                 {userInfo.phone} ({userInfo.vipLevel})
               </h2>
             </div>
+            
+            {/* Balance Display */}
+            <div className="mb-2">
+              <span className="text-gray-300 text-sm">Balance: </span>
+              <span className="text-green-400 text-lg font-semibold">
+                {loading ? '...' : `₹${balance.toLocaleString()}`}
+              </span>
+            </div>
+            
             <div className="flex items-center space-x-2">
               <span className="text-gray-300 text-sm">Invite code: {userInfo.inviteCode}</span>
               <button 

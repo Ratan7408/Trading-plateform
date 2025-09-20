@@ -1,26 +1,17 @@
 import mongoose from 'mongoose';
 
 const adminSettingsSchema = new mongoose.Schema({
-  currency: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  percentageAmount: {
+  tradeName: String,
+  tradeSignal: String,
+  oldTrade: String,
+  oldSignal: String,
+  profitPercentage: {
     type: Number,
-    required: true,
-    min: 0,
-    max: 100
+    default: 6
   },
-  buyAmount: {
+  minimumAmount: {
     type: Number,
-    required: true,
-    min: 0
-  },
-  putAmount: {
-    type: Number,
-    required: true,
-    min: 0
+    default: 600
   },
   isActive: {
     type: Boolean,
