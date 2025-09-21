@@ -11,8 +11,8 @@ const RechargeRecord = () => {
   useEffect(() => {
     const fetchRechargeData = async () => {
       try {
-        const response = await api.get('/recharge/records');
-        setRechargeData(response.data);
+        const response = await api.get('/payments/history?status=completed');
+        setRechargeData(response.data.data?.transactions || []);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching recharge data:', error);
@@ -56,18 +56,21 @@ const RechargeRecord = () => {
                     <p className="text-gray-400 text-sm">{new Date(recharge.createdAt).toLocaleDateString()}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-white font-bold">₹{recharge.amount}</p>
-                    <p className={`text-sm ${
+                    <p className="text-white font-bold">₹{recharge.amount?.toLocaleString()}</p>
+                    <p className={`text-sm font-medium ${
                       recharge.status === 'completed' ? 'text-green-400' : 
-                      recharge.status === 'pending' ? 'text-yellow-400' : 'text-red-400'
+                      recharge.status === 'pending' ? 'text-yellow-400' : 
+                      recharge.status === 'processing' ? 'text-blue-400' : 'text-red-400'
                     }`}>
-                      {recharge.status}
+                      {recharge.status?.toUpperCase()}
                     </p>
                   </div>
                 </div>
                 <div className="text-gray-400 text-sm">
-                  <p>Method: {recharge.method}</p>
-                  <p>Transaction ID: {recharge.transactionId}</p>
+                  <p>Method: {recharge.paymentMethod || 'Bank Transfer'}</p>
+                  <p>Gateway: {recharge.gateway || 'N/A'}</p>
+                  <p>Order ID: {recharge.orderId}</p>
+                  {recharge.transactionId && <p>Transaction ID: {recharge.transactionId}</p>}
                 </div>
               </div>
             ))}

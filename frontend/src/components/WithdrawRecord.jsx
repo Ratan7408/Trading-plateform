@@ -11,8 +11,13 @@ const WithdrawRecord = () => {
   useEffect(() => {
     const fetchWithdrawData = async () => {
       try {
-        const response = await api.get('/withdraw/records');
-        setWithdrawData(response.data);
+        const response = await api.get('/payments/history'); // Get all payment history including payouts
+        // Filter only payout transactions (negative amounts or payout types)
+        const allTransactions = response.data.data?.transactions || [];
+        const withdrawals = allTransactions.filter(tx => 
+          tx.type === 'payout' || tx.amount < 0 || tx.payoutId
+        );
+        setWithdrawData(withdrawals);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching withdraw data:', error);

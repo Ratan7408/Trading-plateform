@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
+import PaymentModal from './PaymentModal';
+import WithdrawModal from './WithdrawModal';
 
 const Profile = ({ onLogout }) => {
   const navigate = useNavigate();
@@ -11,6 +13,8 @@ const Profile = ({ onLogout }) => {
   });
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [showRechargeModal, setShowRechargeModal] = useState(false);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
 
   // Fetch user data from User model
   useEffect(() => {
@@ -89,6 +93,20 @@ const Profile = ({ onLogout }) => {
     console.log('Invite code copied to clipboard');
   };
 
+  // Handle successful recharge
+  const handleRechargeSuccess = (paymentData) => {
+    console.log('Recharge successful:', paymentData);
+    setBalance(prev => prev + paymentData.amount);
+    alert(`Recharge successful! ₹${paymentData.amount} added to your account.`);
+  };
+
+  // Handle successful withdrawal
+  const handleWithdrawSuccess = (payoutData) => {
+    console.log('Withdrawal successful:', payoutData);
+    setBalance(payoutData.newBalance);
+    alert(`Withdrawal request submitted! ₹${payoutData.amount} will be processed in ${payoutData.estimatedTime}.`);
+  };
+
   return (
     <div className="min-h-screen text-white" style={{ backgroundColor: '#121818' }}>
       {/* Header with Back Button */}
@@ -120,11 +138,27 @@ const Profile = ({ onLogout }) => {
             </div>
             
             {/* Balance Display */}
-            <div className="mb-2">
+            <div className="mb-3">
               <span className="text-gray-300 text-sm">Balance: </span>
               <span className="text-green-400 text-lg font-semibold">
                 {loading ? '...' : `₹${balance.toLocaleString()}`}
               </span>
+              
+              {/* Quick Action Buttons */}
+              <div className="flex space-x-2 mt-2">
+                <button
+                  onClick={() => setShowRechargeModal(true)}
+                  className="px-3 py-1 bg-green-500 text-white text-xs rounded-lg hover:bg-green-600 transition-colors"
+                >
+                  + Recharge
+                </button>
+                <button
+                  onClick={() => setShowWithdrawModal(true)}
+                  className="px-3 py-1 bg-red-500 text-white text-xs rounded-lg hover:bg-red-600 transition-colors"
+                >
+                  - Withdraw
+                </button>
+              </div>
             </div>
             
             <div className="flex items-center space-x-2">
@@ -166,6 +200,21 @@ const Profile = ({ onLogout }) => {
             </button>
           ))}
         </div>
+
+        {/* Payment Modal */}
+        <PaymentModal
+          isOpen={showRechargeModal}
+          onClose={() => setShowRechargeModal(false)}
+          onSuccess={handleRechargeSuccess}
+        />
+
+        {/* Withdraw Modal */}
+        <WithdrawModal
+          isOpen={showWithdrawModal}
+          onClose={() => setShowWithdrawModal(false)}
+          onSuccess={handleWithdrawSuccess}
+          userBalance={balance}
+        />
       </div>
     </div>
   );

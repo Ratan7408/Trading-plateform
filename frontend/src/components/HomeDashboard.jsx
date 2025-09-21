@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { externalApi } from '../utils/api';
 import heroImg from '../assets/hero-img.png';
+import PaymentModal from './PaymentModal';
+import WithdrawModal from './WithdrawModal';
 
 const HomeDashboard = () => {
   const navigate = useNavigate();
@@ -10,6 +12,9 @@ const HomeDashboard = () => {
   const [cryptoData, setCryptoData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showServiceModal, setShowServiceModal] = useState(false);
+  const [showRechargeModal, setShowRechargeModal] = useState(false);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [userBalance, setUserBalance] = useState(1000);
 
   // Handle share functionality
   const handleShare = async () => {
@@ -71,6 +76,20 @@ const HomeDashboard = () => {
     setShowServiceModal(false);
   };
 
+  // Handle successful recharge
+  const handleRechargeSuccess = (paymentData) => {
+    console.log('Recharge successful:', paymentData);
+    setUserBalance(prev => prev + paymentData.amount);
+    alert(`Recharge successful! ₹${paymentData.amount} added to your account.`);
+  };
+
+  // Handle successful withdrawal
+  const handleWithdrawSuccess = (payoutData) => {
+    console.log('Withdrawal successful:', payoutData);
+    setUserBalance(payoutData.newBalance);
+    alert(`Withdrawal request submitted! ₹${payoutData.amount} will be processed in ${payoutData.estimatedTime}.`);
+  };
+
   const actionCards = [
     { 
       title: 'Recharge', 
@@ -79,7 +98,7 @@ const HomeDashboard = () => {
           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
         </svg>
       ),
-      onClick: () => console.log('Recharge clicked')
+      onClick: () => setShowRechargeModal(true)
     },
     { 
       title: 'Withdraw', 
@@ -89,7 +108,7 @@ const HomeDashboard = () => {
           <path d="M12 8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 2.5c-.28 0-.5-.22-.5-.5s.22-.5.5-.5.5.22.5.5-.22.5-.5.5z"/>
         </svg>
       ),
-      onClick: () => console.log('Withdraw clicked')
+      onClick: () => setShowWithdrawModal(true)
     },
     { 
       title: 'APP', 
@@ -491,6 +510,21 @@ const HomeDashboard = () => {
           </div>
         </div>
       )}
+
+      {/* Payment Modal */}
+      <PaymentModal
+        isOpen={showRechargeModal}
+        onClose={() => setShowRechargeModal(false)}
+        onSuccess={handleRechargeSuccess}
+      />
+
+      {/* Withdraw Modal */}
+      <WithdrawModal
+        isOpen={showWithdrawModal}
+        onClose={() => setShowWithdrawModal(false)}
+        onSuccess={handleWithdrawSuccess}
+        userBalance={userBalance}
+      />
     </div>
   );
 };

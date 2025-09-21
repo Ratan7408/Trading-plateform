@@ -8,6 +8,7 @@ import rechargeRoutes from './routes/recharge.js';
 import bankRoutes from './routes/bank.js';
 import adminRoutes from './routes/admin.js';
 import tradeRoutes from './routes/trade.js';
+import paymentRoutes from './routes/payment.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -30,6 +31,7 @@ app.use('/api/recharge', rechargeRoutes);
 app.use('/api/bank', bankRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/trade', tradeRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Basic route
 app.get('/', (req, res) => {
