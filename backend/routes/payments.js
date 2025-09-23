@@ -71,6 +71,18 @@ router.post('/create', async (req, res) => {
     console.log("🔧 RETURN_URL from env:", process.env.WATCHGLB_RETURN_URL);
     console.log("🔧 DEPOSIT_KEY length:", process.env.WATCHGLB_DEPOSIT_KEY?.length);
 
+    // Get default bank code if none provided
+    const getDefaultBankCode = (paymentMethod) => {
+      const defaults = {
+        'paytm': 'PAYTM',
+        'upi': 'IDPT0001',  // Canara Bank as default
+        'pix': 'PIX',
+        'momo': 'MOMO',
+        'usdt': 'TRC20'
+      };
+      return defaults[paymentMethod] || '';
+    };
+
     const params = {
       version: '1.0',
       mch_id: process.env.WATCHGLB_MERCHANT_ID,
@@ -78,7 +90,7 @@ router.post('/create', async (req, res) => {
       notify_url: process.env.WATCHGLB_CALLBACK_URL,
       page_url: process.env.WATCHGLB_RETURN_URL,
       pay_type: method.payType,
-      bank_code: bankCode || '',
+      bank_code: bankCode || getDefaultBankCode(paymentMethod),
       trade_amount: amount,
       order_date: new Date().toISOString().slice(0, 19).replace('T', ' '),
       goods_name: subject || 'Recharge',
