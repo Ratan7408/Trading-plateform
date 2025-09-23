@@ -1,10 +1,10 @@
 import crypto from 'crypto';
 
 export function signParams(params, key) {
-  // 1. Remove empty fields and skip sign/sign_type
+  // 1. Remove empty fields and skip sign/sign_type/currency
   const filtered = {};
   for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined && v !== '' && k !== 'sign' && k !== 'sign_type') {
+    if (v !== undefined && v !== '' && k !== 'sign' && k !== 'sign_type' && k !== 'currency') {
       // decode any accidental encoding (avoid %20)
       filtered[k] = decodeURIComponent(v.toString());
     }
