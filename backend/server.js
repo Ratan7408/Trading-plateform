@@ -25,9 +25,13 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-// Allow requests from your frontend
+// Allow requests from your frontend (both local and VPS)
 app.use(cors({
-  origin: 'http://localhost:5173', // your frontend dev server
+  origin: [
+    'http://localhost:5173',     // local development
+    'http://62.72.29.193:5173',  // VPS frontend
+    'http://62.72.29.193:3000'   // alternative VPS port
+  ],
   credentials: true,               // allow cookies, auth headers
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']

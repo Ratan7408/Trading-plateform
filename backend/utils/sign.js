@@ -1,23 +1,25 @@
 import crypto from 'crypto';
 
 export function signParams(params, key) {
-  const stringToSign =
-    `version=${params.version}` +
-    `&mch_id=${params.mch_id}` +
-    `&mch_order_no=${params.mch_order_no}` +
-    `&order_date=${params.order_date}` +
-    `&trade_amount=${params.trade_amount}` +
-    `&goods_name=${encodeURIComponent(params.goods_name)}` +
-    `&notify_url=${params.notify_url}` +
-    `&page_url=${params.page_url}` +
-    `&pay_type=${params.pay_type}` +
-    `&bank_code=${params.bank_code}` +
-    `&currency=${params.currency}` +
-    `&key=${key}`;
+  // 1. Remove empty fields and skip sign/sign_type
+  const filtered = {};
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== '' && k !== 'sign' && k !== 'sign_type') {
+      // decode any accidental encoding (avoid %20)
+      filtered[k] = decodeURIComponent(v.toString());
+    }
+  }
 
-  console.log('🔐 String to sign (fixed order):', stringToSign);
+  // 2. Sort keys alphabetically
+  const sortedKeys = Object.keys(filtered).sort();
 
-  const sign = crypto.createHash('md5').update(stringToSign, 'utf8').digest('hex').toUpperCase();
+  // 3. Build the sign string (no encoding, keep raw spaces)
+  const stringToSign = sortedKeys.map(k => `${k}=${filtered[k]}`).join('&') + `&key=${key}`;
+
+  console.log('🔐 String to sign (RAW):', stringToSign);
+
+  // 4. MD5 lowercase (WatchGLB expects lowercase)
+  const sign = crypto.createHash('md5').update(stringToSign, 'utf8').digest('hex').toLowerCase();
 
   console.log('🔐 Generated sign:', sign);
 
