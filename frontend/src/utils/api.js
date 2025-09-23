@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create axios instance with default configuration
 const api = axios.create({
-  baseURL: 'http://62.72.29.193:5000/api',
+  baseURL: 'http://62.72.29.193/api',  // Use Nginx proxy (no port 5000)
   timeout: 10000,
   withCredentials: true,
   headers: {
