@@ -70,6 +70,18 @@ const signalSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  paymentStatus: {
+    type: String,
+    enum: ['free', 'premium', 'vip'],
+    default: 'free'
+  },
+  gatewayUsed: {
+    type: String,
+    enum: ['qeawapay', 'watchglb']
+  },
+  transactionId: {
+    type: String
+  },
   createdAt: {
     type: Date,
     default: Date.now

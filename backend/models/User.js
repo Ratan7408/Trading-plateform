@@ -32,6 +32,31 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 1000 // Starting balance ₹1000
   },
+  email: {
+    type: String,
+    trim: true,
+    lowercase: true
+  },
+  paymentSettings: {
+    preferredGateway: {
+      type: String,
+      enum: ['qeawapay', 'watchglb'],
+      default: 'qeawapay'
+    },
+    defaultPaymentMethod: {
+      type: String,
+      enum: ['bank_transfer', 'upi', 'wallet', 'netbanking'],
+      default: 'bank_transfer'
+    }
+  },
+  totalDeposits: {
+    type: Number,
+    default: 0
+  },
+  totalWithdrawals: {
+    type: Number,
+    default: 0
+  },
   trades: [{
     symbol: String,
     signal: String,

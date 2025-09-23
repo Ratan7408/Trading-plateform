@@ -1,4 +1,3 @@
-import QeawapayService from '../services/QeawapayService.js';
 import WatchGLBService from '../services/WatchGLBService.js';
 import User from '../models/User.js';
 import mongoose from 'mongoose';
@@ -13,7 +12,7 @@ import logger from '../utils/logger.js';
 const paymentTransactionSchema = new mongoose.Schema({
   orderId: { type: String, required: true, unique: true },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  gateway: { type: String, enum: ['qeawapay', 'watchglb'], required: true },
+  gateway: { type: String, enum: ['watchglb'], required: true },
   amount: { type: Number, required: true },
   currency: { type: String, default: 'INR' },
   status: { 
@@ -46,7 +45,7 @@ const PaymentTransaction = mongoose.model('PaymentTransaction', paymentTransacti
 const payoutTransactionSchema = new mongoose.Schema({
   payoutId: { type: String, required: true, unique: true },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  gateway: { type: String, enum: ['qeawapay', 'watchglb'], required: true },
+  gateway: { type: String, enum: ['watchglb'], required: true },
   amount: { type: Number, required: true },
   currency: { type: String, default: 'INR' },
   status: {
@@ -73,23 +72,22 @@ const PayoutTransaction = mongoose.model('PayoutTransaction', payoutTransactionS
 
 export class PaymentController {
   constructor() {
-    this.qeawapay = new QeawapayService();
-    this.watchglb = new WatchGLBService();
-    this.defaultGateway = process.env.PAYMENT_GATEWAY || 'qeawapay';
+    this.watchglb = null; // Lazy load the service
+    this.defaultGateway = 'watchglb';
   }
 
   /**
    * Get payment service by gateway name
    */
   getPaymentService(gateway = this.defaultGateway) {
-    switch (gateway.toLowerCase()) {
-      case 'qeawapay':
-        return this.qeawapay;
-      case 'watchglb':
-        return this.watchglb;
-      default:
-        throw new Error(`Unsupported payment gateway: ${gateway}`);
+    if (gateway.toLowerCase() === 'watchglb') {
+      if (!this.watchglb) {
+        console.log('🔄 Lazy loading WatchGLB service...');
+        this.watchglb = new WatchGLBService();
+      }
+      return this.watchglb;
     }
+    throw new Error(`Unsupported payment gateway: ${gateway}. Only WatchGLB is supported.`);
   }
 
   /**
@@ -97,21 +95,54 @@ export class PaymentController {
    */
   async createPayment(req, res) {
     try {
-      const { amount, currency, subject, description, paymentMethod, bankCode, gateway } = req.body;
+      console.log('💳 Incoming payment request body:', req.body);
+      console.log('👤 User ID from request:', req.userId);
+      console.log('🔑 Authorization header:', req.headers.authorization);
+      const { amount, currency, subject, description, paymentMethod, bankCode, gateway, payType } = req.body;
       const userId = req.userId;
 
       // Validation
+      console.log('🔍 Validating payment request:', {
+        amount: amount,
+        paymentMethod: paymentMethod,
+        bankCode: bankCode,
+        gateway: gateway,
+        userId: userId
+      });
+
       if (!amount || amount < 100) {
+        console.log('❌ Amount validation failed:', { amount });
         return res.status(400).json({
           success: false,
-          error: 'Minimum payment amount is ₹100'
+          error: 'Minimum payment amount is ₹100',
+          received: { amount }
+        });
+      }
+
+      if (!paymentMethod) {
+        console.log('❌ Payment method validation failed:', { paymentMethod });
+        return res.status(400).json({
+          success: false,
+          error: 'Payment method is required',
+          received: { paymentMethod }
+        });
+      }
+
+      if (paymentMethod === 'bank_transfer' && !bankCode) {
+        console.log('❌ Bank code validation failed for bank transfer');
+        return res.status(400).json({
+          success: false,
+          error: 'Bank code is required for bank transfer',
+          received: { paymentMethod, bankCode }
         });
       }
 
       if (!userId) {
+        console.log('❌ User authentication failed:', { userId });
         return res.status(401).json({
           success: false,
-          error: 'User authentication required'
+          error: 'User authentication required',
+          received: { userId }
         });
       }
 
@@ -133,8 +164,9 @@ export class PaymentController {
         currency: currency || 'INR',
         subject: subject || 'Trading Platform Recharge',
         description: description || `Recharge for ${amount} INR`,
-        paymentMethod: paymentMethod || 'bank_transfer',
-        bankCode: bankCode || '',
+        paymentMethod: paymentMethod || 'upi',
+        payType: payType, // optional explicit WatchGLB pay_type
+        bankCode: paymentMethod === 'bank_transfer' ? (bankCode || '') : undefined,
         userId: userId,
         userName: user.username,
         userEmail: user.email || '',
@@ -143,7 +175,9 @@ export class PaymentController {
       };
 
       // Create payment with selected gateway
+      console.log('💳 Calling payment service with data:', paymentData);
       const result = await paymentService.createPayment(paymentData);
+      console.log('💳 Payment service result:', result);
 
       if (result.success) {
         // Save transaction to database
@@ -226,50 +260,116 @@ export class PaymentController {
         });
       }
 
-      // Query from gateway
-      const paymentService = this.getPaymentService(transaction.gateway);
-      const result = await paymentService.queryPayment(orderId);
+      // Check if this is a test transaction
+      const isTestTransaction = transaction.metadata?.testMode === true || orderId.startsWith('TEST_');
 
-      if (result.success) {
-        // Update transaction status
-        transaction.status = result.status;
-        transaction.transactionId = result.transactionId || transaction.transactionId;
-        transaction.paidAt = result.paidAt;
-        transaction.updatedAt = new Date();
-        
-        await transaction.save();
+      // For test transactions, return the current database status
+      if (isTestTransaction) {
+        logger.info('Test payment status query', {
+          orderId,
+          currentStatus: transaction.status,
+          isTestMode: true
+        });
 
-        // If payment completed, update user balance
-        if (result.status === 'completed' && transaction.status !== 'completed') {
-          const user = await User.findById(userId);
-          user.balance += transaction.amount;
-          await user.save();
-
-          logger.info('User balance updated after payment', {
-            userId: userId,
+        return res.json({
+          success: true,
+          data: {
+            orderId: transaction.orderId,
+            status: transaction.status,
             amount: transaction.amount,
-            newBalance: user.balance,
-            orderId: orderId
+            currency: transaction.currency,
+            transactionId: transaction.transactionId,
+            paidAt: transaction.paidAt,
+            gateway: transaction.gateway,
+            isTestMode: true
+          }
+        });
+      }
+
+      // For real transactions, query from gateway
+      try {
+        const paymentService = this.getPaymentService(transaction.gateway);
+        const result = await paymentService.queryPayment(orderId);
+
+        if (result.success) {
+          // Update transaction status
+          const oldStatus = transaction.status;
+          transaction.status = result.status;
+          transaction.transactionId = result.transactionId || transaction.transactionId;
+          transaction.paidAt = result.paidAt;
+          transaction.updatedAt = new Date();
+          
+          await transaction.save();
+
+          // If payment completed and wasn't already completed, update user balance
+          if (result.status === 'completed' && oldStatus !== 'completed') {
+            const user = await User.findById(userId);
+            if (user) {
+              user.balance += transaction.amount;
+              user.totalDeposits += transaction.amount;
+              await user.save();
+
+              logger.info('User balance updated after payment', {
+                userId: userId,
+                amount: transaction.amount,
+                newBalance: user.balance,
+                orderId: orderId
+              });
+            }
+          }
+
+          res.json({
+            success: true,
+            data: {
+              orderId: result.orderId,
+              status: result.status,
+              amount: result.amount,
+              currency: result.currency,
+              transactionId: result.transactionId,
+              paidAt: result.paidAt,
+              gateway: transaction.gateway
+            }
+          });
+
+        } else {
+          // If gateway query fails, return database status
+          logger.warn('Gateway query failed, returning database status', {
+            orderId,
+            gatewayError: result.error,
+            databaseStatus: transaction.status
+          });
+
+          res.json({
+            success: true,
+            data: {
+              orderId: transaction.orderId,
+              status: transaction.status,
+              amount: transaction.amount,
+              currency: transaction.currency,
+              transactionId: transaction.transactionId,
+              paidAt: transaction.paidAt,
+              gateway: transaction.gateway,
+              note: 'Gateway query failed, showing database status'
+            }
           });
         }
 
+      } catch (gatewayError) {
+        // If gateway error, return database status
+        logger.error('Gateway query error, returning database status', gatewayError);
+        
         res.json({
           success: true,
           data: {
-            orderId: result.orderId,
-            status: result.status,
-            amount: result.amount,
-            currency: result.currency,
-            transactionId: result.transactionId,
-            paidAt: result.paidAt,
-            gateway: transaction.gateway
+            orderId: transaction.orderId,
+            status: transaction.status,
+            amount: transaction.amount,
+            currency: transaction.currency,
+            transactionId: transaction.transactionId,
+            paidAt: transaction.paidAt,
+            gateway: transaction.gateway,
+            note: 'Gateway temporarily unavailable'
           }
-        });
-
-      } else {
-        res.status(400).json({
-          success: false,
-          error: result.error
         });
       }
 
@@ -278,7 +378,8 @@ export class PaymentController {
       
       res.status(500).json({
         success: false,
-        error: 'Internal server error'
+        error: 'Internal server error',
+        message: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   }

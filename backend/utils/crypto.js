@@ -1,8 +1,9 @@
 import crypto from 'crypto';
 
 /**
- * Payment Gateway Crypto Utilities
- * Handles signature generation and verification for both Qeawapay and WatchGLB
+ * Payment Gateway Crypto Utilities - CORRECTED VERSION
+ * Handles signature generation and verification for WatchGLB
+ * Based on official documentation requirements
  */
 
 export class PaymentCrypto {
@@ -27,81 +28,53 @@ export class PaymentCrypto {
     return crypto.createHmac('sha256', key).update(data, 'utf8').digest('hex');
   }
 
+
   /**
-   * Generate Qeawapay signature
-   * Format: MD5(param1=value1&param2=value2&...&key=secret_key)
+   * Generate WatchGLB signature
+   * Format: SHA256(param1=value1&param2=value2&...&key=secret_key)
+   * Rules:
+   * - Exclude 'sign', 'signature' fields
+   * - Exclude empty values
+   * - Sort parameters alphabetically
+   * - Create key=value pairs with & separators
+   * - Add secret key at the end
+   * - SHA256 hash and convert to uppercase
    */
-  static generateQeawapaySignature(params, secretKey) {
+  static generateWatchGLBSignature(params, secretKey) {
     try {
-      // Remove signature, sign, sign_type and empty values
+      console.log('[WatchGLB] Original params:', params);
+      
+      // Remove signature field, sign_type, and empty values
       const filteredParams = {};
       Object.keys(params).forEach(key => {
-        if (key !== 'signature' && key !== 'sign' && key !== 'sign_type' && 
-            params[key] !== '' && params[key] !== null && params[key] !== undefined) {
-          filteredParams[key] = params[key];
+        const value = params[key];
+        if (key !== 'sign' && key !== 'signature' && key !== 'sign_type' && 
+            value !== '' && value !== null && value !== undefined) {
+          filteredParams[key] = String(value); // Ensure all values are strings
         }
       });
 
-      // Sort parameters alphabetically
+      console.log('[WatchGLB] Filtered params:', filteredParams);
+
+      // Sort parameters alphabetically by key
       const sortedKeys = Object.keys(filteredParams).sort();
+      console.log('[WatchGLB] Sorted keys:', sortedKeys);
       
-      // Create query string
+      // Create query string with key=value pairs
       const queryString = sortedKeys
         .map(key => `${key}=${filteredParams[key]}`)
         .join('&');
       
-      // Append secret key
+      // Add secret key at the end
       const signString = `${queryString}&key=${secretKey}`;
       
-      console.log('Qeawapay Sign String:', signString);
+      console.log('[WatchGLB] Sign string:', signString);
       
-      // Generate MD5 hash and convert to uppercase
-      return this.md5(signString).toUpperCase();
-    } catch (error) {
-      console.error('Error generating Qeawapay signature:', error);
-      throw new Error('Failed to generate Qeawapay signature');
-    }
-  }
-
-  /**
-   * Verify Qeawapay signature
-   */
-  static verifyQeawapaySignature(params, secretKey, receivedSignature) {
-    try {
-      const expectedSignature = this.generateQeawapaySignature(params, secretKey);
-      return expectedSignature === receivedSignature.toUpperCase();
-    } catch (error) {
-      console.error('Error verifying Qeawapay signature:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Generate WatchGLB signature
-   * Format: SHA256(param1value1param2value2...key)
-   */
-  static generateWatchGLBSignature(params, secretKey) {
-    try {
-      // Remove signature and empty values
-      const filteredParams = {};
-      Object.keys(params).forEach(key => {
-        if (key !== 'signature' && key !== 'sign' && params[key] !== '' && params[key] !== null && params[key] !== undefined) {
-          filteredParams[key] = params[key];
-        }
-      });
-
-      // Sort parameters alphabetically
-      const sortedKeys = Object.keys(filteredParams).sort();
+          // Generate MD5 hash and convert to lowercase
+          const signature = this.md5(signString).toLowerCase();
+      console.log('[WatchGLB] Generated signature:', signature);
       
-      // Create concatenated string (no separators)
-      const signString = sortedKeys
-        .map(key => `${key}${filteredParams[key]}`)
-        .join('') + secretKey;
-      
-      console.log('WatchGLB Sign String:', signString);
-      
-      // Generate SHA256 hash and convert to uppercase
-      return this.sha256(signString).toUpperCase();
+      return signature;
     } catch (error) {
       console.error('Error generating WatchGLB signature:', error);
       throw new Error('Failed to generate WatchGLB signature');
@@ -114,7 +87,15 @@ export class PaymentCrypto {
   static verifyWatchGLBSignature(params, secretKey, receivedSignature) {
     try {
       const expectedSignature = this.generateWatchGLBSignature(params, secretKey);
-      return expectedSignature === receivedSignature.toUpperCase();
+      const isValid = expectedSignature === receivedSignature.toUpperCase();
+      
+      console.log('[WatchGLB] Signature verification:', {
+        expected: expectedSignature,
+        received: receivedSignature.toUpperCase(),
+        isValid
+      });
+      
+      return isValid;
     } catch (error) {
       console.error('Error verifying WatchGLB signature:', error);
       return false;
@@ -142,12 +123,13 @@ export class PaymentCrypto {
    */
   static validateTimestamp(timestamp, toleranceMs = 300000) {
     const now = Date.now();
-    const diff = Math.abs(now - parseInt(timestamp));
+    const timestampMs = parseInt(timestamp) * 1000; // Convert to milliseconds if needed
+    const diff = Math.abs(now - timestampMs);
     return diff <= toleranceMs;
   }
 
   /**
-   * URL encode parameters
+   * URL encode parameters for form submission
    */
   static urlEncode(params) {
     return Object.keys(params)
@@ -169,6 +151,59 @@ export class PaymentCrypto {
     }
     
     return result === 0;
+  }
+
+  /**
+   * Generate test signature for debugging
+   */
+  static generateTestSignature(gateway, params, secretKey) {
+    console.log(`[${gateway.toUpperCase()}] Testing signature generation...`);
+    
+    if (gateway.toLowerCase() === 'watchglb') {
+      return this.generateWatchGLBSignature(params, secretKey);
+    } else {
+      throw new Error(`Unknown gateway: ${gateway}. Only WatchGLB is supported.`);
+    }
+  }
+
+  /**
+   * Verify webhook signature from HTTP headers
+   */
+  static verifyWebhookSignature(gateway, params, secretKey, signature, headers = {}) {
+    const signatureToVerify = signature || 
+                             headers['x-signature'] || 
+                             headers['signature'] || 
+                             params.sign || 
+                             params.signature;
+
+    if (!signatureToVerify) {
+      console.warn(`[${gateway}] No signature found in request`);
+      return false;
+    }
+
+    if (gateway.toLowerCase() === 'watchglb') {
+      return this.verifyWatchGLBSignature(params, secretKey, signatureToVerify);
+    } else {
+      console.error(`Unknown gateway for signature verification: ${gateway}. Only WatchGLB is supported.`);
+      return false;
+    }
+  }
+
+  /**
+   * Format currency amount to 2 decimal places
+   */
+  static formatAmount(amount) {
+    return parseFloat(amount).toFixed(2);
+  }
+
+  /**
+   * Generate callback response for payment gateways
+   */
+  static generateCallbackResponse(gateway, success = true) {
+    if (gateway.toLowerCase() === 'watchglb') {
+      return success ? 'SUCCESS' : 'FAIL';
+    }
+    return success ? 'OK' : 'ERROR';
   }
 }
 

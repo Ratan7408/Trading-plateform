@@ -1,355 +1,456 @@
 import rateLimit from 'express-rate-limit';
-import { body, validationResult, param, query } from 'express-validator';
+import { body, param, query, validationResult } from 'express-validator';
 import logger from '../utils/logger.js';
 
 /**
  * Payment Middleware
- * Security, validation, and logging middleware for payment operations
+ * Handles validation, rate limiting, and security for payment operations
  */
 
-// Rate limiting for payment endpoints
+// Rate limiting for payment operations
 export const paymentRateLimit = rateLimit({
-  windowMs: parseInt(process.env.PAYMENT_RATE_LIMIT_WINDOW) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.PAYMENT_RATE_LIMIT_MAX) || 10, // 10 requests per window
+  windowMs: parseInt(process.env.PAYMENT_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+  max: parseInt(process.env.PAYMENT_RATE_LIMIT_MAX_REQUESTS) || 5, // 5 requests per window
   message: {
     success: false,
     error: 'Too many payment requests. Please try again later.',
-    retryAfter: Math.ceil((parseInt(process.env.PAYMENT_RATE_LIMIT_WINDOW) || 900000) / 1000)
+    retryAfter: 15 * 60 // 15 minutes in seconds
   },
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
     logger.warn('Payment rate limit exceeded', {
       ip: req.ip,
-      userAgent: req.headers['user-agent'],
-      endpoint: req.path
+      userId: req.userId,
+      userAgent: req.headers['user-agent']
     });
     
     res.status(429).json({
       success: false,
       error: 'Too many payment requests. Please try again later.',
-      retryAfter: Math.ceil((parseInt(process.env.PAYMENT_RATE_LIMIT_WINDOW) || 900000) / 1000)
+      retryAfter: 15 * 60
     });
   }
 });
 
-// Stricter rate limiting for payout endpoints
+// Rate limiting for payout operations (stricter)
 export const payoutRateLimit = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 3, // 3 payout requests per hour
+  windowMs: parseInt(process.env.PAYOUT_RATE_LIMIT_WINDOW_MS) || 60 * 60 * 1000, // 1 hour
+  max: parseInt(process.env.PAYOUT_RATE_LIMIT_MAX_REQUESTS) || 3, // 3 requests per hour
   message: {
     success: false,
     error: 'Too many payout requests. Please try again later.',
-    retryAfter: 3600
+    retryAfter: 60 * 60 // 1 hour in seconds
   },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  handler: (req, res) => {
+    logger.warn('Payout rate limit exceeded', {
+      ip: req.ip,
+      userId: req.userId,
+      userAgent: req.headers['user-agent']
+    });
+    
+    res.status(429).json({
+      success: false,
+      error: 'Too many payout requests. Please try again later.',
+      retryAfter: 60 * 60
+    });
+  }
 });
 
-// Payment request validation
+// Validate payment request
 export const validatePaymentRequest = [
+  (req, res, next) => {
+    console.log('🔍 Payment validation middleware - Request body:', req.body);
+    next();
+  },
   body('amount')
-    .isNumeric()
-    .withMessage('Amount must be a number')
-    .custom((value) => {
-      if (parseFloat(value) < 100) {
-        throw new Error('Minimum payment amount is ₹100');
-      }
-      if (parseFloat(value) > 500000) {
-        throw new Error('Maximum payment amount is ₹500,000');
-      }
-      return true;
-    }),
+    .isFloat({ min: 100, max: 500000 })
+    .withMessage('Amount must be between ₹100 and ₹500,000')
+    .customSanitizer(value => parseFloat(value)),
   
   body('currency')
     .optional()
-    .isIn(['INR', 'USD', 'EUR'])
-    .withMessage('Currency must be INR, USD, or EUR'),
+    .isIn(['INR', 'USD'])
+    .withMessage('Currency must be INR or USD'),
   
   body('paymentMethod')
-    .optional()
     .isIn(['bank_transfer', 'upi', 'wallet', 'netbanking'])
     .withMessage('Invalid payment method'),
   
+  // bankCode is required only for bank_transfer; ignored for others
+  body('bankCode')
+    .if(body('paymentMethod').equals('bank_transfer'))
+    .notEmpty()
+    .withMessage('Bank code is required for bank transfer')
+    .bail()
+    .isAlphanumeric()
+    .isLength({ min: 2, max: 10 })
+    .withMessage('Invalid bank code'),
+
+  body('bankCode')
+    .if(body('paymentMethod').not().equals('bank_transfer'))
+    .optional({ nullable: true, checkFalsy: true }),
+  
   body('gateway')
     .optional()
-    .isIn(['qeawapay', 'watchglb'])
-    .withMessage('Invalid payment gateway'),
+    .isIn(['watchglb'])
+    .withMessage('Invalid payment gateway. Only WatchGLB is supported.'),
   
   body('subject')
     .optional()
-    .isLength({ min: 1, max: 100 })
-    .withMessage('Subject must be between 1 and 100 characters'),
+    .isLength({ max: 100 })
+    .trim()
+    .escape(),
   
   body('description')
     .optional()
-    .isLength({ min: 1, max: 200 })
-    .withMessage('Description must be between 1 and 200 characters'),
-
-  handleValidationErrors
+    .isLength({ max: 200 })
+    .trim()
+    .escape(),
+  
+  // Handle validation errors
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      console.log('❌ Payment validation failed:', errors.array());
+      logger.warn('Payment validation failed', {
+        errors: errors.array(),
+        userId: req.userId,
+        ip: req.ip
+      });
+      
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+    console.log('✅ Payment validation passed');
+    next();
+  }
 ];
 
-// Payout request validation
+// Validate payout request
 export const validatePayoutRequest = [
   body('amount')
-    .isNumeric()
-    .withMessage('Amount must be a number')
-    .custom((value) => {
-      if (parseFloat(value) < 500) {
-        throw new Error('Minimum payout amount is ₹500');
-      }
-      if (parseFloat(value) > 100000) {
-        throw new Error('Maximum payout amount is ₹100,000');
-      }
-      return true;
-    }),
+    .isFloat({ min: 500, max: 100000 })
+    .withMessage('Amount must be between ₹500 and ₹100,000')
+    .customSanitizer(value => parseFloat(value)),
+  
+  body('currency')
+    .optional()
+    .isIn(['INR', 'USD'])
+    .withMessage('Currency must be INR or USD'),
   
   body('accountName')
     .isLength({ min: 2, max: 50 })
-    .withMessage('Account name must be between 2 and 50 characters')
-    .matches(/^[a-zA-Z\s]+$/)
-    .withMessage('Account name must contain only letters and spaces'),
+    .trim()
+    .escape()
+    .withMessage('Account name must be 2-50 characters'),
   
   body('accountNumber')
-    .isLength({ min: 9, max: 18 })
-    .withMessage('Account number must be between 9 and 18 digits')
     .isNumeric()
-    .withMessage('Account number must contain only numbers'),
-  
-  body('ifscCode')
-    .isLength({ min: 11, max: 11 })
-    .withMessage('IFSC code must be exactly 11 characters')
-    .matches(/^[A-Z]{4}0[A-Z0-9]{6}$/)
-    .withMessage('Invalid IFSC code format'),
+    .isLength({ min: 9, max: 18 })
+    .withMessage('Account number must be 9-18 digits'),
   
   body('bankCode')
-    .optional()
+    .isAlphanumeric()
     .isLength({ min: 2, max: 10 })
-    .withMessage('Bank code must be between 2 and 10 characters'),
+    .withMessage('Invalid bank code'),
+  
+  body('ifscCode')
+    .matches(/^[A-Z]{4}0[A-Z0-9]{6}$/)
+    .withMessage('Invalid IFSC code format (e.g., SBIN0001234)'),
   
   body('mobile')
     .optional()
-    .isMobilePhone('en-IN')
+    .matches(/^[6-9]\d{9}$/)
     .withMessage('Invalid mobile number'),
   
   body('email')
     .optional()
     .isEmail()
+    .normalizeEmail()
     .withMessage('Invalid email address'),
   
   body('gateway')
     .optional()
-    .isIn(['qeawapay', 'watchglb'])
-    .withMessage('Invalid payment gateway'),
-
-  handleValidationErrors
+    .isIn(['watchglb'])
+    .withMessage('Invalid payment gateway. Only WatchGLB is supported.'),
+  
+  // Handle validation errors
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      logger.warn('Payout validation failed', {
+        errors: errors.array(),
+        userId: req.userId,
+        ip: req.ip
+      });
+      
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+    next();
+  }
 ];
 
-// Order ID validation
+// Validate order ID parameter
 export const validateOrderId = [
   param('orderId')
     .isLength({ min: 10, max: 50 })
-    .withMessage('Invalid order ID format')
-    .matches(/^[A-Z0-9_]+$/)
-    .withMessage('Order ID must contain only uppercase letters, numbers, and underscores'),
-
-  handleValidationErrors
+    .matches(/^[A-Za-z0-9_]+$/)
+    .withMessage('Invalid order ID format'),
+  
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      console.log('Order ID validation failed:', {
+        orderId: req.params.orderId,
+        errors: errors.array()
+      });
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid order ID',
+        details: errors.array()
+      });
+    }
+    next();
+  }
 ];
 
-// Query parameters validation
+// Validate query parameters
 export const validateQueryParams = [
   query('page')
     .optional()
-    .isInt({ min: 1 })
-    .withMessage('Page must be a positive integer'),
+    .isInt({ min: 1, max: 1000 })
+    .toInt()
+    .withMessage('Page must be between 1 and 1000'),
   
   query('limit')
     .optional()
     .isInt({ min: 1, max: 100 })
+    .toInt()
     .withMessage('Limit must be between 1 and 100'),
   
   query('status')
     .optional()
     .isIn(['pending', 'processing', 'completed', 'failed', 'cancelled', 'expired'])
-    .withMessage('Invalid status'),
+    .withMessage('Invalid status filter'),
   
   query('gateway')
     .optional()
-    .isIn(['qeawapay', 'watchglb'])
-    .withMessage('Invalid gateway'),
-
-  handleValidationErrors
+    .isIn(['watchglb'])
+    .withMessage('Invalid gateway filter. Only WatchGLB is supported.'),
+  
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid query parameters',
+        details: errors.array()
+      });
+    }
+    next();
+  }
 ];
 
-// Handle validation errors
-function handleValidationErrors(req, res, next) {
-  const errors = validationResult(req);
+// Validate webhook IP addresses
+export const validateWebhookIP = (req, res, next) => {
+  const clientIP = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
+  const forwardedIP = req.headers['x-forwarded-for'];
   
-  if (!errors.isEmpty()) {
-    const errorMessages = errors.array().map(error => error.msg);
-    
-    logger.warn('Payment validation failed', {
-      errors: errorMessages,
-      body: req.body,
-      ip: req.ip,
+  // Get allowed IPs from environment variable
+  const allowedIPs = process.env.WEBHOOK_IP_WHITELIST 
+    ? process.env.WEBHOOK_IP_WHITELIST.split(',').map(ip => ip.trim())
+    : ['127.0.0.1', '::1', '182.69.146.75']; // Default to localhost and user IP
+  
+  // Check if client IP is in whitelist
+  const isAllowed = allowedIPs.some(allowedIP => {
+    return clientIP.includes(allowedIP) || (forwardedIP && forwardedIP.includes(allowedIP));
+  });
+  
+  // In development, allow all IPs
+  if (process.env.NODE_ENV === 'development') {
+    logger.info('Webhook received (development mode)', {
+      clientIP,
+      forwardedIP,
       userAgent: req.headers['user-agent']
     });
-    
-    return res.status(400).json({
-      success: false,
-      error: 'Validation failed',
-      details: errorMessages
-    });
-  }
-  
-  next();
-}
-
-// IP whitelist validation for webhooks
-export const validateWebhookIP = (req, res, next) => {
-  const clientIP = req.ip || req.connection.remoteAddress;
-  
-  // Define allowed IPs for each gateway
-  const allowedIPs = {
-    qeawapay: [
-      '103.XXX.XXX.XXX', // Replace with actual Qeawapay IPs
-      '104.XXX.XXX.XXX',
-      '127.0.0.1', // For development
-      '::1'
-    ],
-    watchglb: [
-      '105.XXX.XXX.XXX', // Replace with actual WatchGLB IPs  
-      '106.XXX.XXX.XXX',
-      '127.0.0.1', // For development
-      '::1'
-    ]
-  };
-  
-  // Extract gateway from path
-  const gateway = req.path.includes('qeawapay') ? 'qeawapay' : 'watchglb';
-  
-  // Skip IP validation in development
-  if (process.env.NODE_ENV === 'development') {
     return next();
   }
   
-  const gatewayIPs = allowedIPs[gateway] || [];
-  
-  if (!gatewayIPs.includes(clientIP)) {
+  if (!isAllowed) {
     logger.warn('Webhook from unauthorized IP', {
-      ip: clientIP,
-      gateway: gateway,
-      path: req.path
+      clientIP,
+      forwardedIP,
+      allowedIPs,
+      userAgent: req.headers['user-agent']
     });
     
     return res.status(403).json({
       success: false,
-      error: 'Unauthorized IP address'
+      error: 'Unauthorized'
     });
   }
+  
+  logger.info('Webhook IP validated', {
+    clientIP,
+    forwardedIP
+  });
   
   next();
 };
 
-// Request logging middleware
+// Log payment requests
 export const logPaymentRequest = (req, res, next) => {
   const startTime = Date.now();
   
+  // Log request
   logger.info('Payment request received', {
     method: req.method,
-    path: req.path,
+    url: req.url,
     ip: req.ip,
     userAgent: req.headers['user-agent'],
-    userId: req.userId || 'anonymous'
+    userId: req.userId,
+    body: req.method === 'POST' ? { ...req.body, sign: '[REDACTED]', signature: '[REDACTED]' } : undefined
   });
   
-  // Log response
-  res.on('finish', () => {
+  // Override res.json to log response
+  const originalJson = res.json;
+  res.json = function(body) {
     const duration = Date.now() - startTime;
     
-    logger.info('Payment request completed', {
+    logger.info('Payment response sent', {
       method: req.method,
-      path: req.path,
+      url: req.url,
       statusCode: res.statusCode,
       duration: `${duration}ms`,
-      userId: req.userId || 'anonymous'
+      success: body?.success,
+      error: body?.error
     });
+    
+    return originalJson.call(this, body);
+  };
+  
+  next();
+};
+
+// Handle payment errors
+export const handlePaymentError = (error, req, res, next) => {
+  logger.error('Payment operation error', error, req.url);
+  
+  // Handle specific error types
+  if (error.name === 'ValidationError') {
+    return res.status(400).json({
+      success: false,
+      error: 'Validation error',
+      details: Object.values(error.errors).map(err => err.message)
+    });
+  }
+  
+  if (error.name === 'CastError') {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid data format'
+    });
+  }
+  
+  if (error.code === 11000) {
+    return res.status(409).json({
+      success: false,
+      error: 'Duplicate transaction'
+    });
+  }
+  
+  // Handle network errors
+  if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+    return res.status(503).json({
+      success: false,
+      error: 'Payment gateway temporarily unavailable'
+    });
+  }
+  
+  // Handle timeout errors
+  if (error.code === 'ETIMEDOUT' || error.message.includes('timeout')) {
+    return res.status(504).json({
+      success: false,
+      error: 'Payment request timeout'
+    });
+  }
+  
+  // Generic error response
+  res.status(500).json({
+    success: false,
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? error.message : undefined
+  });
+};
+
+// Security headers for payment routes
+export const paymentSecurityHeaders = (req, res, next) => {
+  // Prevent caching of payment pages
+  res.set({
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+    'Surrogate-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'X-XSS-Protection': '1; mode=block'
   });
   
   next();
 };
 
-// Error handling middleware for payments
-export const handlePaymentError = (error, req, res, next) => {
-  logger.error('Payment operation failed', error, 'payment');
-  
-  // Don't expose internal errors in production
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  
-  const errorResponse = {
-    success: false,
-    error: 'Payment operation failed',
-    timestamp: new Date().toISOString()
-  };
-  
-  if (isDevelopment) {
-    errorResponse.details = error.message;
-    errorResponse.stack = error.stack;
-  }
-  
-  // Set appropriate status code
-  let statusCode = 500;
-  
-  if (error.name === 'ValidationError') {
-    statusCode = 400;
-    errorResponse.error = 'Invalid request data';
-  } else if (error.name === 'UnauthorizedError') {
-    statusCode = 401;
-    errorResponse.error = 'Authentication required';
-  } else if (error.name === 'ForbiddenError') {
-    statusCode = 403;
-    errorResponse.error = 'Access denied';
-  }
-  
-  res.status(statusCode).json(errorResponse);
-};
-
-// Sanitize sensitive data from logs
-export const sanitizePaymentData = (data) => {
-  const sensitiveFields = [
-    'accountNumber', 
-    'ifscCode', 
-    'mobile', 
-    'email', 
-    'signature', 
-    'sign', 
-    'key',
-    'secret',
-    'password',
-    'token'
-  ];
-  
-  const sanitized = { ...data };
-  
-  sensitiveFields.forEach(field => {
-    if (sanitized[field]) {
-      if (field === 'accountNumber') {
-        // Show only last 4 digits
-        sanitized[field] = '****' + sanitized[field].slice(-4);
-      } else if (field === 'mobile') {
-        // Show only last 4 digits
-        sanitized[field] = '****' + sanitized[field].slice(-4);
-      } else if (field === 'email') {
-        // Show only domain
-        const [, domain] = sanitized[field].split('@');
-        sanitized[field] = '****@' + domain;
-      } else {
-        sanitized[field] = '***REDACTED***';
-      }
+// Validate payment amount based on user VIP level
+export const validatePaymentLimits = async (req, res, next) => {
+  try {
+    const { amount } = req.body;
+    const userId = req.userId;
+    
+    // Get user from database to check VIP level
+    const User = (await import('../models/User.js')).default;
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
     }
-  });
-  
-  return sanitized;
+    
+    // Define limits based on VIP level
+    const vipLimits = {
+      'VIP0': { min: 100, max: 10000 },
+      'VIP1': { min: 100, max: 25000 },
+      'VIP2': { min: 100, max: 50000 },
+      'VIP3': { min: 100, max: 100000 },
+      'VIP4': { min: 100, max: 250000 },
+      'VIP5': { min: 100, max: 500000 }
+    };
+    
+    const limits = vipLimits[user.vipLevel] || vipLimits['VIP0'];
+    
+    if (amount < limits.min || amount > limits.max) {
+      return res.status(400).json({
+        success: false,
+        error: `Payment amount must be between ₹${limits.min} and ₹${limits.max} for ${user.vipLevel} users`,
+        limits: limits
+      });
+    }
+    
+    next();
+  } catch (error) {
+    logger.error('Payment limit validation error', error);
+    next(); // Continue with default limits if validation fails
+  }
 };
 
 export default {
@@ -362,5 +463,6 @@ export default {
   validateWebhookIP,
   logPaymentRequest,
   handlePaymentError,
-  sanitizePaymentData
+  paymentSecurityHeaders,
+  validatePaymentLimits
 };

@@ -24,7 +24,7 @@ const WithdrawModal = ({ isOpen, onClose, onSuccess, userBalance = 0 }) => {
     ifscCode: '',
     mobile: '',
     email: '',
-    gateway: 'qeawapay'
+    gateway: 'watchglb'
   });
 
   const [validationErrors, setValidationErrors] = useState({});
@@ -120,7 +120,7 @@ const WithdrawModal = ({ isOpen, onClose, onSuccess, userBalance = 0 }) => {
       ifscCode: '',
       mobile: '',
       email: '',
-      gateway: 'qeawapay'
+      gateway: 'watchglb'
     });
     setValidationErrors({});
     setPayoutData(null);
@@ -186,7 +186,7 @@ const WithdrawModal = ({ isOpen, onClose, onSuccess, userBalance = 0 }) => {
                   Payment Gateway
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  {['qeawapay', 'watchglb'].map((gateway) => (
+                  {['watchglb'].map((gateway) => (
                     <button
                       key={gateway}
                       type="button"
@@ -197,7 +197,7 @@ const WithdrawModal = ({ isOpen, onClose, onSuccess, userBalance = 0 }) => {
                           : 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'
                       }`}
                     >
-                      {gateway === 'qeawapay' ? 'QeawaPay' : 'WatchGLB'}
+                      WatchGLB
                     </button>
                   ))}
                 </div>

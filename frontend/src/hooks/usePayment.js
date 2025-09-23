@@ -2,10 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 
 /**
- * Payment Hook
- * Handles all payment operations for the trading platform
+ * Payment Hook - Updated with better error handling
  */
-
 export const usePayment = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -22,43 +20,56 @@ export const usePayment = () => {
   }, [error]);
 
   /**
-   * Create payment order
+   * Create payment order - Locked down version
    */
   const createPayment = useCallback(async (paymentData) => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await api.post('/payments/test/create', paymentData);
-      
-      if (response.data.success) {
-        return {
-          success: true,
-          data: response.data.data
-        };
-      } else {
-        throw new Error(response.data.error || 'Payment creation failed');
+      // Force correct types and required fields
+      const payload = {
+        amount: Number(paymentData.amount), // ensure number
+        currency: 'INR',
+        subject: paymentData.subject || 'Trading Platform Recharge',
+        description: paymentData.description || `Recharge for ₹${paymentData.amount}`,
+        paymentMethod: paymentData.paymentMethod || 'upi',
+        // Only include bankCode if provided (required for bank_transfer only)
+        ...(paymentData.bankCode ? { bankCode: paymentData.bankCode } : {}),
+        // Use WatchGLB as active gateway per new configuration
+        gateway: 'watchglb'
+      };
+
+      const response = await api.post('/payments/create', payload, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`, // add JWT
+        },
+      });
+      const body = response.data;
+      // Clean router returns raw WatchGLB response
+      if (body && body.respCode === 'SUCCESS' && body.tradeResult === '1' && body.payInfo) {
+        try { window.location.href = body.payInfo; } catch {}
+        return { success: true, url: body.payInfo };
       }
+      // Legacy controller shape
+      if (body && body.success && body.data?.paymentUrl) {
+        try { window.location.href = body.data.paymentUrl; } catch {}
+        return { success: true, url: body.data.paymentUrl };
+      }
+      throw new Error(body?.error || body?.tradeMsg || body?.errorMsg || 'Payment creation failed');
     } catch (err) {
       const errorMessage = err.response?.data?.error || err.message || 'Payment creation failed';
       setError(errorMessage);
-      
-      return {
-        success: false,
-        error: errorMessage
-      };
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
   }, []);
 
   /**
-   * Query payment status
+   * Query payment status with better error handling
    */
   const queryPaymentStatus = useCallback(async (orderId) => {
-    setLoading(true);
-    setError(null);
-
     try {
       const response = await api.get(`/payments/${orderId}/status`);
       
@@ -71,15 +82,14 @@ export const usePayment = () => {
         throw new Error(response.data.error || 'Payment query failed');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.error || err.message || 'Payment query failed';
-      setError(errorMessage);
+      // Don't set global error for status queries as they might be polling
+      console.warn('Payment status query failed:', err.message);
       
       return {
         success: false,
-        error: errorMessage
+        error: err.response?.data?.error || err.message || 'Payment query failed',
+        isNetworkError: err.code === 'NETWORK_ERROR' || err.response?.status >= 500
       };
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -151,42 +161,67 @@ export const usePayment = () => {
    * Get supported payment methods
    */
   const getPaymentMethods = useCallback(async (gateway = null) => {
-    setLoading(true);
-    setError(null);
-
     try {
       const queryParams = gateway ? `?gateway=${gateway}` : '';
       const response = await api.get(`/payments/methods${queryParams}`);
-      
-      if (response.data.success) {
-        setPaymentMethods(response.data.data.methods);
-        setSupportedBanks(response.data.data.banks);
-        
-        return {
-          success: true,
-          data: response.data.data
-        };
-      } else {
-        throw new Error(response.data.error || 'Failed to fetch payment methods');
+      const body = response.data;
+      // Clean router returns array
+      if (Array.isArray(body)) {
+        setPaymentMethods(body);
+        setSupportedBanks([]);
+        return { success: true, data: { methods: body, banks: [] } };
       }
+      // Legacy controller shape
+      if (body?.success && body.data?.methods) {
+        setPaymentMethods(body.data.methods);
+        setSupportedBanks(body.data.banks || []);
+        return { success: true, data: body.data };
+      }
+      throw new Error(body?.error || 'Failed to fetch payment methods');
     } catch (err) {
-      const errorMessage = err.response?.data?.error || err.message || 'Failed to fetch payment methods';
-      setError(errorMessage);
+      console.warn('Failed to fetch payment methods:', err.message);
+      
+      // Set default methods if API fails
+      const defaultMethods = [
+        { method: 'upi', label: 'India UPI' },
+        { method: 'paytm', label: 'India Paytm' },
+        { method: 'usdt', label: 'USDT (Crypto)' },
+        { method: 'pix', label: 'Brazil PIX' },
+        { method: 'momo', label: 'Vietnam MOMO' }
+      ];
+      
+      const defaultBanks = [
+        { code: 'SBI', name: 'State Bank of India' },
+        { code: 'HDFC', name: 'HDFC Bank' },
+        { code: 'ICICI', name: 'ICICI Bank' }
+      ];
+      
+      setPaymentMethods(defaultMethods);
+      setSupportedBanks(defaultBanks);
       
       return {
         success: false,
-        error: errorMessage
+        error: err.message,
+        fallbackData: {
+          methods: defaultMethods,
+          banks: defaultBanks
+        }
       };
-    } finally {
-      setLoading(false);
     }
   }, []);
 
+  // Simple alias matching example usage
+  const fetchMethods = useCallback(async () => {
+    await getPaymentMethods('watchglb');
+  }, [getPaymentMethods]);
+
   /**
-   * Poll payment status until completion
+   * Poll payment status until completion with improved error handling
    */
   const pollPaymentStatus = useCallback((orderId, onStatusChange, maxAttempts = 30, interval = 5000) => {
     let attempts = 0;
+    let consecutiveErrors = 0;
+    const maxConsecutiveErrors = 3;
     
     const poll = async () => {
       if (attempts >= maxAttempts) {
@@ -201,6 +236,7 @@ export const usePayment = () => {
       const result = await queryPaymentStatus(orderId);
       
       if (result.success) {
+        consecutiveErrors = 0; // Reset error counter on success
         const status = result.data.status;
         onStatusChange(result);
         
@@ -208,10 +244,27 @@ export const usePayment = () => {
         if (['completed', 'failed', 'cancelled', 'expired'].includes(status)) {
           return;
         }
+      } else {
+        consecutiveErrors++;
+        
+        // If we have too many consecutive errors, stop polling
+        if (consecutiveErrors >= maxConsecutiveErrors) {
+          onStatusChange({
+            success: false,
+            error: 'Multiple consecutive errors during status polling'
+          });
+          return;
+        }
+        
+        // For network errors, continue polling but log the issue
+        if (result.isNetworkError) {
+          console.warn(`Network error during polling attempt ${attempts}, continuing...`);
+        }
       }
       
-      // Continue polling
-      setTimeout(poll, interval);
+      // Continue polling with exponential backoff on errors
+      const nextInterval = consecutiveErrors > 0 ? interval * Math.pow(2, consecutiveErrors) : interval;
+      setTimeout(poll, Math.min(nextInterval, 30000)); // Max 30 second interval
     };
 
     poll();
@@ -226,32 +279,42 @@ export const usePayment = () => {
       return null;
     }
 
-    const paymentWindow = window.open(
-      paymentUrl,
-      `payment_${orderId}`,
-      'width=800,height=600,scrollbars=yes,resizable=yes'
-    );
+    try {
+      const paymentWindow = window.open(
+        paymentUrl,
+        `payment_${orderId}`,
+        'width=800,height=600,scrollbars=yes,resizable=yes'
+      );
 
-    if (!paymentWindow) {
-      setError('Please allow popups for payment processing');
+      if (!paymentWindow) {
+        setError('Please allow popups for payment processing');
+        return null;
+      }
+
+      return paymentWindow;
+    } catch {
+      setError('Failed to open payment window');
       return null;
     }
-
-    return paymentWindow;
   }, []);
 
   /**
    * Format currency amount
    */
   const formatAmount = useCallback((amount, currency = 'INR') => {
-    const formatter = new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    });
+    try {
+      const formatter = new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: currency,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2
+      });
 
-    return formatter.format(amount);
+      return formatter.format(amount);
+    } catch {
+      // Fallback formatting
+      return `₹${parseFloat(amount).toFixed(2)}`;
+    }
   }, []);
 
   /**
@@ -344,6 +407,8 @@ export const usePayment = () => {
     error,
     paymentHistory,
     paymentMethods,
+    // alias for simpler consumers
+    methods: paymentMethods,
     supportedBanks,
     
     // Actions
@@ -352,6 +417,7 @@ export const usePayment = () => {
     getPaymentHistory,
     createPayout,
     getPaymentMethods,
+    fetchMethods,
     pollPaymentStatus,
     openPaymentWindow,
     

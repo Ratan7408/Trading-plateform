@@ -66,6 +66,18 @@ const tradeSchema = new mongoose.Schema({
     type: Boolean,
     default: null
   },
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'completed', 'failed'],
+    default: 'completed'
+  },
+  transactionId: {
+    type: String
+  },
+  gatewayUsed: {
+    type: String,
+    enum: ['qeawapay', 'watchglb']
+  },
   marketData: {
     volume24h: Number,
     marketCap: Number,

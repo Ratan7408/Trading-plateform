@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { usePayment } from '../hooks/usePayment';
+import api from '../utils/api';
 
 /**
  * Payment Modal Component
@@ -25,7 +26,7 @@ const PaymentModal = ({ isOpen, onClose, onSuccess }) => {
     amount: '',
     paymentMethod: 'bank_transfer',
     bankCode: '',
-    gateway: 'qeawapay',
+    gateway: 'watchglb',
     subject: 'Trading Platform Recharge',
     description: ''
   });
@@ -34,6 +35,7 @@ const PaymentModal = ({ isOpen, onClose, onSuccess }) => {
   const [currentStep, setCurrentStep] = useState('form'); // form, processing, success, error
   const [paymentData, setPaymentData] = useState(null);
   const [paymentWindow, setPaymentWindow] = useState(null);
+  const [banks, setBanks] = useState([]);
 
   // Load payment methods on mount
   useEffect(() => {
@@ -51,6 +53,28 @@ const PaymentModal = ({ isOpen, onClose, onSuccess }) => {
       }));
     }
   }, [formData.amount, formatAmount]);
+
+  // Fetch banks/channels when payment method changes
+  useEffect(() => {
+    const loadBanks = async () => {
+      try {
+        if (!formData.paymentMethod) {
+          setBanks([]);
+          return;
+        }
+        const res = await fetch(`http://localhost:5000/api/payments/banks?method=${encodeURIComponent(formData.paymentMethod)}`);
+        if (!res.ok) {
+          setBanks([]);
+          return;
+        }
+        const data = await res.json();
+        setBanks(Array.isArray(data) ? data : []);
+      } catch {
+        setBanks([]);
+      }
+    };
+    loadBanks();
+  }, [formData.paymentMethod]);
 
   // Handle form input changes
   const handleInputChange = (field, value) => {
@@ -93,6 +117,10 @@ const PaymentModal = ({ isOpen, onClose, onSuccess }) => {
 
     setCurrentStep('processing');
     
+    // Debug form data before sending
+    console.log('📝 PaymentModal - Form data being sent:', formData);
+    console.log('📝 PaymentModal - Form data validation:', validation);
+    
     // Create payment
     const result = await createPayment(formData);
     
@@ -114,6 +142,20 @@ const PaymentModal = ({ isOpen, onClose, onSuccess }) => {
       );
     } else {
       setCurrentStep('error');
+    }
+  };
+
+  // Complete test payments (for development only)
+  const autoCompleteTestPayment = async (orderId) => {
+    if (orderId.startsWith('TEST_')) {
+      try {
+        const response = await api.post(`/payments/test/complete/${orderId}`);
+        if (response.data.success) {
+          console.log('Test payment auto-completed:', orderId);
+        }
+      } catch (error) {
+        console.warn('Failed to auto-complete test payment:', error);
+      }
     }
   };
 
@@ -150,7 +192,7 @@ const PaymentModal = ({ isOpen, onClose, onSuccess }) => {
       amount: '',
       paymentMethod: 'bank_transfer',
       bankCode: '',
-      gateway: 'qeawapay',
+      gateway: 'watchglb',
       subject: 'Trading Platform Recharge',
       description: ''
     });
@@ -212,7 +254,7 @@ const PaymentModal = ({ isOpen, onClose, onSuccess }) => {
                   Payment Gateway
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  {['qeawapay', 'watchglb'].map((gateway) => (
+                  {['watchglb'].map((gateway) => (
                     <button
                       key={gateway}
                       type="button"
@@ -223,7 +265,7 @@ const PaymentModal = ({ isOpen, onClose, onSuccess }) => {
                           : 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'
                       }`}
                     >
-                      {gateway === 'qeawapay' ? 'QeawaPay' : 'WatchGLB'}
+                      WatchGLB
                     </button>
                   ))}
                 </div>
@@ -275,19 +317,24 @@ const PaymentModal = ({ isOpen, onClose, onSuccess }) => {
                   onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
                   className="w-full px-3 py-2 bg-gray-700 text-white border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  {paymentMethods.map((method) => (
-                    <option key={method.code} value={method.code}>
-                      {method.icon} {method.name}
-                    </option>
-                  ))}
+                  {paymentMethods.map((method) => {
+                    const value = method.code || method.method;
+                    const label = method.name || method.label || value;
+                    const icon = method.icon || '';
+                    return (
+                      <option key={value} value={value}>
+                        {icon} {label}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
-              {/* Bank Selection */}
-              {formData.paymentMethod === 'bank_transfer' && (
+              {/* Bank/Channel Selection (by method) */}
+              {banks.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-white mb-2">
-                    Select Bank
+                    Select Bank / Channel
                   </label>
                   <select
                     value={formData.bankCode}
@@ -297,9 +344,9 @@ const PaymentModal = ({ isOpen, onClose, onSuccess }) => {
                     }`}
                   >
                     <option value="" className="bg-gray-700">Select Bank</option>
-                    {supportedBanks.map((bank) => (
-                      <option key={bank.code} value={bank.code} className="bg-gray-700">
-                        {bank.name}
+                    {banks.map((b) => (
+                      <option key={b.code} value={b.code} className="bg-gray-700">
+                        {b.label || b.name}
                       </option>
                     ))}
                   </select>
@@ -377,30 +424,33 @@ const PaymentModal = ({ isOpen, onClose, onSuccess }) => {
                     </div>
                   )}
                   
-                  {/* Manual Payment Completion for Testing */}
-                  <div className="mt-4 text-center">
-                    <p className="text-sm text-gray-400 mb-3">
-                      For testing: Click below to simulate payment completion
-                    </p>
-                    <button 
-                      onClick={async () => {
-                        try {
-                          const response = await api.post(`/payments/test/complete/${paymentData.orderId}`);
-                          if (response.data.success) {
-                            handlePaymentStatusChange({
-                              success: true,
-                              data: response.data.data
-                            });
-                          }
-                        } catch (error) {
-                          console.error('Payment completion error:', error);
-                        }
-                      }}
-                      className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-                    >
-                      ✅ Complete Payment
-                    </button>
-                  </div>
+                  {/* Test Payment Completion Button (Development Only) */}
+                  {paymentData.orderId && paymentData.orderId.startsWith('TEST_') && (
+                    <div className="mt-4 text-center">
+                      <div className="bg-yellow-900 border border-yellow-600 rounded-lg p-3 mb-3">
+                        <p className="text-yellow-200 text-sm">
+                          🧪 Development Mode - Test Payment
+                        </p>
+                      </div>
+                      <button 
+                        onClick={() => autoCompleteTestPayment(paymentData.orderId)}
+                        className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                      >
+                        ✅ Complete Test Payment
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* Real Payment Instructions */}
+                  {paymentData.orderId && !paymentData.orderId.startsWith('TEST_') && (
+                    <div className="mt-4 text-center">
+                      <div className="bg-blue-900 border border-blue-600 rounded-lg p-3 mb-3">
+                        <p className="text-blue-200 text-sm">
+                          💳 Real Payment Gateway - Complete payment in the opened window
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

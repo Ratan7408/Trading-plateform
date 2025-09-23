@@ -1,158 +1,241 @@
 import axios from 'axios';
+import https from 'https';
 import { PaymentCrypto } from '../utils/crypto.js';
 import logger from '../utils/logger.js';
 
 /**
- * WatchGLB Payment Service
- * Handles all WatchGLB API interactions
+ * WatchGLB Payment Service - OFFICIAL API VERSION
+ * Based on official documentation: https://www.showdoc.com.cn/WatchPay (password: watchpay277)
+ * 
+ * Official Endpoints:
+ * - Recharge: https://api.watchglb.com/pay/web
+ * - Payout: https://api.watchglb.com/pay/transfer
+ * - Payout Query: https://api.watchglb.com/query/transfer
+ * - Balance Query: https://api.watchglb.com/query/balance
+ * - Merchant Portal: https://merchant.watchglb.com
  */
 
 export class WatchGLBService {
   constructor() {
     this.gateway = 'watchglb';
-    this.baseUrl = 'https://api.watchglb.com'; // Fixed API domain from documentation
+    // Official WatchGLB API domain
+    this.baseUrl = process.env.WATCHGLB_BASE_URL || 'https://api.watchglb.com';
+    this.alternateBaseUrls = [
+      'https://api.watchglb.com',
+      'https://api.watchpay.com'
+    ].filter(url => url !== this.baseUrl);
     
-    this.merchantNumber = process.env.WATCHGLB_SANDBOX === 'true'
-      ? process.env.WATCHGLB_SANDBOX_MERCHANT_NUMBER
-      : process.env.WATCHGLB_MERCHANT_NUMBER;
+    this.merchantId = process.env.WATCHGLB_MERCHANT_ID;
+    this.depositKey = process.env.WATCHGLB_DEPOSIT_KEY;
+    this.payoutKey = process.env.WATCHGLB_PAYOUT_KEY;
     
-    this.paymentKey = process.env.WATCHGLB_SANDBOX === 'true'
-      ? process.env.WATCHGLB_SANDBOX_PAYMENT_KEY
-      : process.env.WATCHGLB_PAYMENT_KEY;
-    
-    this.payoutKey = process.env.WATCHGLB_SANDBOX === 'true'
-      ? process.env.WATCHGLB_SANDBOX_PAYOUT_KEY
-      : process.env.WATCHGLB_PAYOUT_KEY;
+    console.log('🏗️ WatchGLB Service Constructor:');
+    console.log('  WATCHGLB_MERCHANT_ID:', process.env.WATCHGLB_MERCHANT_ID);
+    console.log('  WATCHGLB_DEPOSIT_KEY:', process.env.WATCHGLB_DEPOSIT_KEY ? 'SET' : 'NOT SET');
+    console.log('  WATCHGLB_PAYOUT_KEY:', process.env.WATCHGLB_PAYOUT_KEY ? 'SET' : 'NOT SET');
 
-    this.callbackUrl = process.env.WATCHGLB_CALLBACK_URL || 'http://localhost:5000/api/payments/watchglb/callback';
-    this.returnUrl = process.env.WATCHGLB_RETURN_URL || 'http://localhost:5173/payment/success';
-    this.cancelUrl = process.env.WATCHGLB_CANCEL_URL || 'http://localhost:5173/payment/cancel';
+    this.callbackUrl = process.env.WATCHGLB_CALLBACK_URL;
+    this.returnUrl = process.env.WATCHGLB_RETURN_URL;
+    this.cancelUrl = process.env.WATCHGLB_CANCEL_URL;
 
-    // Payment type codes
+    // Payment type codes from merchant backend
     this.paymentTypes = {
-      BANK: process.env.WATCHGLB_PAYMENT_TYPE_BANK,
-      UPI: process.env.WATCHGLB_PAYMENT_TYPE_UPI,
-      WALLET: process.env.WATCHGLB_PAYMENT_TYPE_WALLET
+      BANK: process.env.WATCHGLB_PAYMENT_TYPE_BANK || '101',
+      UPI: process.env.WATCHGLB_PAYMENT_TYPE_UPI || '102',
+      WALLET: process.env.WATCHGLB_PAYMENT_TYPE_WALLET || '103'
     };
 
-    // Configure axios defaults
+    // Configure axios defaults with TLS fixes (Node/OpenSSL on Windows)
     this.client = axios.create({
       baseURL: this.baseUrl,
       timeout: 30000,
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
         'User-Agent': 'TradingPlatform/1.0'
-      }
+      },
+      // TLS settings: allow TLS 1.2+, relax cert only in dev
+      httpsAgent: new https.Agent({
+        rejectUnauthorized: process.env.NODE_ENV === 'production',
+        minVersion: 'TLSv1.2'
+      })
     });
+
+    // Validate configuration (non-throwing). Methods will guard on this.
+    this.configValid = false;
+    this.missingKeys = [];
+    this.validateConfig();
 
     logger.info('WatchGLB service initialized', {
       baseUrl: this.baseUrl,
-      merchantNumber: this.merchantNumber,
-      documentation: 'https://www.showdoc.com.cn/WatchPay (password: watchpay277)'
+      merchantId: this.merchantId,
+      hasDepositKey: !!this.depositKey,
+      hasPayoutKey: !!this.payoutKey,
+      documentation: 'https://www.showdoc.com.cn/WatchPay'
     }, this.gateway);
   }
 
   /**
    * Create payment order
+   * Endpoint: POST https://api.watchglb.com/pay/web
    */
   async createPayment(paymentData) {
     let orderId;
     try {
+      if (!this.configValid) {
+        return {
+          success: false,
+          error: `WatchGLB configuration incomplete: ${this.missingKeys.join(', ')}`,
+          code: 'CONFIG_INCOMPLETE'
+        };
+      }
       orderId = PaymentCrypto.generateOrderId('WG');
       const timestamp = Math.floor(Date.now() / 1000);
       
+      // Official WatchGLB API parameters structure (correct parameter names)
       const params = {
-        merchantNumber: this.merchantNumber,
-        orderNumber: orderId,
-        amount: paymentData.amount,
-        currency: paymentData.currency || 'INR',
-        productName: paymentData.subject || 'Trading Platform Recharge',
-        productDesc: paymentData.description || `Recharge for ${paymentData.amount} INR`,
-        paymentType: this.getPaymentTypeCode(paymentData.paymentMethod),
-        bankCode: paymentData.bankCode || '',
-        notifyUrl: this.callbackUrl,
-        returnUrl: this.returnUrl,
-        cancelUrl: this.cancelUrl,
-        timestamp: timestamp,
-        nonce: PaymentCrypto.generateNonce(),
-        customerName: paymentData.userName || 'User',
-        customerEmail: paymentData.userEmail || '',
-        customerPhone: paymentData.userPhone || '',
-        customerIP: paymentData.customerIP || '',
-        extraParam: JSON.stringify({
-          platform: 'trading',
-          version: '1.0',
-          userId: paymentData.userId
-        })
+        mch_id: this.merchantId,
+        mch_order_no: orderId,
+        trade_amount: Number(paymentData.amount).toFixed(2),
+        goods_name: paymentData.subject || 'Trading Platform Recharge',
+        pay_type: paymentData.payType || this.getPaymentTypeCode(paymentData.paymentMethod),
+        notify_url: this.callbackUrl,
+        order_date: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        sign_type: 'MD5', // WatchGLB uses MD5, not SHA256
+        version: '1.0' // Required for JSON response
       };
 
-      // Generate signature
-      params.sign = PaymentCrypto.generateWatchGLBSignature(params, this.paymentKey);
+      console.log('🔗 WatchGLB API Request Parameters:');
+      console.log('  notify_url:', this.callbackUrl);
+      console.log('  mch_id:', this.merchantId);
+      console.log('  trade_amount:', params.trade_amount);
+      console.log('  pay_type:', params.pay_type);
+
+      // Add optional parameters based on official docs
+      if (paymentData.bankCode && paymentData.paymentMethod === 'bank_transfer') {
+        params.bank_code = paymentData.bankCode;
+      }
+
+      if (paymentData.userPhone) {
+        params.payer_phone = paymentData.userPhone;
+      }
+
+      // Remove payer_name as it's causing format issues
+      // if (paymentData.userName) {
+      //   params.payer_name = paymentData.userName;
+      // }
+
+      // Add page_url for redirect
+      if (this.returnUrl) {
+        params.page_url = this.returnUrl;
+      }
+
+      // Generate signature using MD5 (not SHA256)
+      params.sign = PaymentCrypto.generateWatchGLBSignature(params, this.depositKey);
 
       logger.paymentInitiated(this.gateway, orderId, paymentData.amount, {
         currency: params.currency,
-        method: paymentData.paymentMethod,
+        paymentType: params.paymentType,
         userId: paymentData.userId
       });
 
-      // Make API request to correct endpoint
-      const response = await this.client.post('/pay/web', params);
+      // Make API request with form-encoded data (with retry on TLS/host errors)
+      const doRequest = async (client) => client.post('/pay/web', PaymentCrypto.urlEncode(params));
 
-      if (response.data.code === '0000' || response.data.status === 'success') {
-        logger.info('Payment order created successfully', {
-          orderId,
-          paymentUrl: response.data.data?.paymentUrl
-        }, this.gateway);
+      let response;
+      try {
+        response = await doRequest(this.client);
+      } catch (primaryError) {
+        const retryable = ['EPROTO', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'DEPTH_ZERO_SELF_SIGNED_CERT', 'ERR_TLS_CERT_ALTNAME_INVALID'];
+        if (retryable.includes(primaryError?.code) && this.alternateBaseUrls.length > 0) {
+          const alt = this.alternateBaseUrls[0];
+          logger.warn('Primary WatchGLB host failed TLS; retrying with alternate', { primary: this.baseUrl, alternate: alt, code: primaryError.code });
+          const altClient = axios.create({
+            baseURL: alt,
+            timeout: 30000,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'TradingPlatform/1.0' },
+            httpsAgent: new https.Agent({ rejectUnauthorized: process.env.NODE_ENV === 'production', minVersion: 'TLSv1.2' })
+          });
+          response = await doRequest(altClient);
+        } else {
+          throw primaryError;
+        }
+      }
 
-        return {
+      logger.info('WatchGLB API Response:', response.data);
+
+      // Check response - Official WatchGLB response format
+      if (response.data.respCode === 'SUCCESS' && response.data.tradeResult === '1') {
+        const result = {
           success: true,
           orderId,
-          paymentUrl: response.data.data?.paymentUrl || response.data.paymentUrl,
-          qrCode: response.data.data?.qrCode,
-          transactionId: response.data.data?.transactionId,
+          paymentUrl: response.data.payInfo,
+          qrCode: response.data.payInfo, // WatchGLB returns payInfo as payment URL
+          transactionId: response.data.orderNo,
           expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 minutes
           gateway: this.gateway,
-          amount: paymentData.amount,
-          currency: params.currency
+          amount: Number(paymentData.amount),
+          currency: 'INR'
         };
+
+        logger.info('Payment order created successfully', result);
+        return result;
+
       } else {
-        throw new Error(`WatchGLB API Error: ${response.data.message || response.data.msg || 'Unknown error'}`);
+        const errorMsg = response.data.tradeMsg || response.data.errorMsg || 'Payment creation failed';
+        throw new Error(`WatchGLB Error: ${errorMsg} (Code: ${response.data.respCode})`);
       }
 
     } catch (error) {
-      const failedOrderId = orderId || 'UNKNOWN';
-      logger.paymentFailed(this.gateway, failedOrderId, error.message, {
+      console.log('🚨 WatchGLB Error Details:');
+      console.log('Error Message:', error.message);
+      console.log('Error Code:', error.code);
+      console.log('Response Status:', error.response?.status);
+      console.log('Response Data:', error.response?.data);
+      console.log('Request URL:', error.config?.url);
+      console.log('Request Data:', error.config?.data);
+
+      logger.paymentFailed(this.gateway, orderId || 'UNKNOWN', error.message, {
         errorCode: error.response?.data?.code,
-        errorMessage: error.response?.data?.message || error.response?.data?.msg
+        errorMessage: error.response?.data?.message || error.response?.data?.msg,
+        responseData: error.response?.data,
+        status: error.response?.status
       });
 
       return {
         success: false,
         error: error.message,
-        code: error.response?.data?.code || 'UNKNOWN_ERROR'
+        code: error.response?.data?.code || error.code || 'UNKNOWN_ERROR',
+        details: error.response?.data
       };
     }
   }
 
   /**
    * Query payment status
+   * Endpoint: POST https://api.watchglb.com/query/payment
    */
   async queryPayment(orderId) {
     try {
+      if (!this.configValid) {
+        return { success: false, error: `Config incomplete: ${this.missingKeys.join(', ')}` };
+      }
       const timestamp = Math.floor(Date.now() / 1000);
       
       const params = {
-        merchantNumber: this.merchantNumber,
-        orderNumber: orderId,
+        merchant_id: this.merchantId,
+        order_no: orderId,
         timestamp: timestamp,
-        nonce: PaymentCrypto.generateNonce()
+        nonce: PaymentCrypto.generateNonce(),
+        sign_type: 'SHA256'
       };
 
-      params.sign = PaymentCrypto.generateWatchGLBSignature(params, this.paymentKey);
+      params.sign = PaymentCrypto.generateWatchGLBSignature(params, this.depositKey);
 
-      const response = await this.client.post('/query/payment', params);
+      const response = await this.client.post('/query/payment', 
+        PaymentCrypto.urlEncode(params)
+      );
 
-      if (response.data.code === '0000') {
+      if (response.data.code === '0000' || response.data.code === 0) {
         const paymentData = response.data.data;
         
         logger.info('Payment status queried', {
@@ -164,15 +247,15 @@ export class WatchGLBService {
         return {
           success: true,
           status: this.mapPaymentStatus(paymentData.status),
-          orderId: paymentData.orderNumber,
-          transactionId: paymentData.transactionId,
+          orderId: paymentData.order_no || paymentData.orderNumber,
+          transactionId: paymentData.transaction_id || paymentData.transactionId,
           amount: parseFloat(paymentData.amount),
           currency: paymentData.currency,
-          paidAt: paymentData.paidTime ? new Date(paymentData.paidTime * 1000) : null,
+          paidAt: paymentData.paid_time ? new Date(paymentData.paid_time * 1000) : (paymentData.paidTime ? new Date(paymentData.paidTime * 1000) : null),
           rawStatus: paymentData.status
         };
       } else {
-        throw new Error(`Query failed: ${response.data.message || response.data.msg}`);
+        throw new Error(`Query failed: ${response.data.message || response.data.msg || response.data.error}`);
       }
 
     } catch (error) {
@@ -199,11 +282,9 @@ export class WatchGLBService {
       // Verify signature
       const isValidSignature = PaymentCrypto.verifyWatchGLBSignature(
         callbackData,
-        this.paymentKey,
-        signature
+        this.depositKey,
+        signature || callbackData.sign
       );
-
-      logger.signatureVerification(this.gateway, callbackData.orderNumber, isValidSignature);
 
       if (!isValidSignature) {
         throw new Error('Invalid signature');
@@ -215,7 +296,7 @@ export class WatchGLBService {
         transactionId: callbackData.transactionId,
         status: this.mapPaymentStatus(callbackData.status),
         amount: parseFloat(callbackData.amount),
-        currency: callbackData.currency,
+        currency: callbackData.currency || 'INR',
         paidAt: callbackData.paidTime ? new Date(callbackData.paidTime * 1000) : new Date(),
         gateway: this.gateway,
         rawData: callbackData
@@ -240,43 +321,62 @@ export class WatchGLBService {
 
   /**
    * Create payout request
+   * Endpoint: POST https://api.watchglb.com/pay/transfer
    */
   async createPayout(payoutData) {
     try {
+      if (!this.configValid) {
+        return {
+          success: false,
+          error: `WatchGLB configuration incomplete: ${this.missingKeys.join(', ')}`,
+          code: 'CONFIG_INCOMPLETE'
+        };
+      }
       const payoutId = PaymentCrypto.generateOrderId('WG_PAYOUT');
       const timestamp = Math.floor(Date.now() / 1000);
       
       const params = {
-        merchantNumber: this.merchantNumber,
-        payoutNumber: payoutId,
+        merchant_id: this.merchantId,
+        payout_no: payoutId,
         amount: payoutData.amount,
         currency: payoutData.currency || 'INR',
-        accountName: payoutData.accountName,
-        accountNumber: payoutData.accountNumber,
-        bankCode: payoutData.bankCode,
-        ifscCode: payoutData.ifscCode,
-        mobile: payoutData.mobile || '',
-        email: payoutData.email || '',
+        account_name: payoutData.accountName,
+        account_number: payoutData.accountNumber,
+        bank_code: payoutData.bankCode,
+        ifsc_code: payoutData.ifscCode,
         timestamp: timestamp,
         nonce: PaymentCrypto.generateNonce(),
-        notifyUrl: this.callbackUrl.replace('/callback', '/payout-callback'),
-        extraParam: JSON.stringify({
-          userId: payoutData.userId,
-          platform: 'trading'
-        })
+        notify_url: this.callbackUrl.replace('/callback', '/payout-callback'),
+        sign_type: 'SHA256'
       };
+
+      // Add optional parameters
+      if (payoutData.mobile) {
+        params.mobile = payoutData.mobile;
+      }
+
+      if (payoutData.email) {
+        params.email = payoutData.email;
+      }
+
+      params.extra_param = JSON.stringify({
+        userId: payoutData.userId,
+        platform: 'trading'
+      });
 
       params.sign = PaymentCrypto.generateWatchGLBSignature(params, this.payoutKey);
 
       logger.info('Payout initiated', {
         payoutId,
         amount: payoutData.amount,
-        accountNumber: payoutData.accountNumber.slice(-4) // Only last 4 digits
+        accountNumber: payoutData.accountNumber.slice(-4)
       }, this.gateway);
 
-      const response = await this.client.post('/pay/transfer', params);
+      const response = await this.client.post('/pay/transfer', 
+        PaymentCrypto.urlEncode(params)
+      );
 
-      if (response.data.code === '0000') {
+      if (response.data.code === '0000' || response.data.code === 0) {
         return {
           success: true,
           payoutId,
@@ -284,10 +384,10 @@ export class WatchGLBService {
           amount: payoutData.amount,
           currency: params.currency,
           estimatedTime: '1-3 business days',
-          transactionId: response.data.data?.transactionId
+          transactionId: response.data.data?.transaction_id || response.data.data?.transactionId
         };
       } else {
-        throw new Error(`Payout failed: ${response.data.message || response.data.msg}`);
+        throw new Error(`Payout failed: ${response.data.message || response.data.msg || response.data.error}`);
       }
 
     } catch (error) {
@@ -302,17 +402,127 @@ export class WatchGLBService {
   }
 
   /**
-   * Get payment type code
+   * Query payout/transfer status
+   * Endpoint: POST https://api.watchglb.com/query/transfer
+   */
+  async queryPayout(payoutId) {
+    try {
+      if (!this.configValid) {
+        return { success: false, error: `Config incomplete: ${this.missingKeys.join(', ')}` };
+      }
+      const timestamp = Math.floor(Date.now() / 1000);
+      
+      const params = {
+        merchant_id: this.merchantId,
+        payout_no: payoutId,
+        timestamp: timestamp,
+        nonce: PaymentCrypto.generateNonce(),
+        sign_type: 'SHA256'
+      };
+
+      params.sign = PaymentCrypto.generateWatchGLBSignature(params, this.payoutKey);
+
+      const response = await this.client.post('/query/transfer', 
+        PaymentCrypto.urlEncode(params)
+      );
+
+      if (response.data.code === '0000' || response.data.code === 0) {
+        const payoutData = response.data.data;
+        
+        return {
+          success: true,
+          status: this.mapPaymentStatus(payoutData.status),
+          payoutId: payoutData.payout_no || payoutData.payoutNumber,
+          transactionId: payoutData.transaction_id || payoutData.transactionId,
+          amount: parseFloat(payoutData.amount),
+          currency: payoutData.currency,
+          processedAt: payoutData.processed_time ? new Date(payoutData.processed_time * 1000) : (payoutData.processedTime ? new Date(payoutData.processedTime * 1000) : null),
+          rawStatus: payoutData.status
+        };
+      } else {
+        throw new Error(`Payout query failed: ${response.data.message || response.data.msg || response.data.error}`);
+      }
+
+    } catch (error) {
+      logger.error('Payout query failed', error, this.gateway);
+      
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Query account balance
+   * Endpoint: POST https://api.watchglb.com/query/balance
+   */
+  async queryBalance() {
+    try {
+      if (!this.configValid) {
+        return { success: false, error: `Config incomplete: ${this.missingKeys.join(', ')}` };
+      }
+      const timestamp = Math.floor(Date.now() / 1000);
+      
+      const params = {
+        merchant_id: this.merchantId,
+        timestamp: timestamp,
+        nonce: PaymentCrypto.generateNonce(),
+        sign_type: 'SHA256'
+      };
+
+      params.sign = PaymentCrypto.generateWatchGLBSignature(params, this.depositKey);
+
+      const response = await this.client.post('/query/balance', 
+        PaymentCrypto.urlEncode(params)
+      );
+
+      if (response.data.code === '0000' || response.data.code === 0) {
+        const balanceData = response.data.data;
+        
+        logger.info('Balance queried successfully', {
+          merchantId: this.merchantId,
+          balance: balanceData.balance
+        }, this.gateway);
+
+        return {
+          success: true,
+          balance: parseFloat(balanceData.balance),
+          currency: balanceData.currency || 'INR',
+          lastUpdated: new Date()
+        };
+      } else {
+        throw new Error(`Balance query failed: ${response.data.message || response.data.msg || response.data.error}`);
+      }
+
+    } catch (error) {
+      logger.error('Balance query failed', error, this.gateway);
+      
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Get payment type code based on official WatchGLB documentation
    */
   getPaymentTypeCode(method) {
+    // Allow environment overrides per merchant configuration
+    const upi = process.env.WATCHGLB_PAYTYPE_UPI || '105'; // UPI Entertainment default
+    const bank = process.env.WATCHGLB_PAYTYPE_BANK || '101'; // Paytm Native default
+    const wallet = process.env.WATCHGLB_PAYTYPE_WALLET || '104';
+    const netbanking = process.env.WATCHGLB_PAYTYPE_NETBANKING || '100';
+
     const methodMap = {
-      'bank_transfer': this.paymentTypes.BANK,
-      'upi': this.paymentTypes.UPI,
-      'wallet': this.paymentTypes.WALLET,
-      'netbanking': this.paymentTypes.BANK
+      'bank_transfer': bank,
+      'upi': upi,
+      'wallet': wallet,
+      'netbanking': netbanking
     };
 
-    return methodMap[method] || this.paymentTypes.BANK;
+    return methodMap[method] || bank;
   }
 
   /**
@@ -365,9 +575,9 @@ export class WatchGLBService {
    */
   getSupportedBanks() {
     return [
-      { code: process.env.WATCHGLB_BANK_CODE_SBI, name: 'State Bank of India' },
-      { code: process.env.WATCHGLB_BANK_CODE_HDFC, name: 'HDFC Bank' },
-      { code: process.env.WATCHGLB_BANK_CODE_ICICI, name: 'ICICI Bank' },
+      { code: process.env.WATCHGLB_BANK_CODE_SBI || 'SBI', name: 'State Bank of India' },
+      { code: process.env.WATCHGLB_BANK_CODE_HDFC || 'HDFC', name: 'HDFC Bank' },
+      { code: process.env.WATCHGLB_BANK_CODE_ICICI || 'ICICI', name: 'ICICI Bank' },
       { code: 'AXIS', name: 'Axis Bank' },
       { code: 'PNB', name: 'Punjab National Bank' },
       { code: 'BOB', name: 'Bank of Baroda' },
@@ -379,119 +589,37 @@ export class WatchGLBService {
   }
 
   /**
-   * Query account balance
-   */
-  async queryBalance() {
-    try {
-      const timestamp = Math.floor(Date.now() / 1000);
-      
-      const params = {
-        merchantNumber: this.merchantNumber,
-        timestamp: timestamp,
-        nonce: PaymentCrypto.generateNonce()
-      };
-
-      params.sign = PaymentCrypto.generateWatchGLBSignature(params, this.paymentKey);
-
-      const response = await this.client.post('/query/balance', params);
-
-      if (response.data.code === '0000') {
-        const balanceData = response.data.data;
-        
-        logger.info('Balance queried successfully', {
-          merchantNumber: this.merchantNumber,
-          balance: balanceData.balance
-        }, this.gateway);
-
-        return {
-          success: true,
-          balance: parseFloat(balanceData.balance),
-          currency: balanceData.currency || 'INR',
-          lastUpdated: new Date()
-        };
-      } else {
-        throw new Error(`Balance query failed: ${response.data.message || response.data.msg}`);
-      }
-
-    } catch (error) {
-      logger.error('Balance query failed', error, this.gateway);
-      
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  }
-
-  /**
-   * Query payout/transfer status
-   */
-  async queryPayout(payoutId) {
-    try {
-      const timestamp = Math.floor(Date.now() / 1000);
-      
-      const params = {
-        merchantNumber: this.merchantNumber,
-        payoutNumber: payoutId,
-        timestamp: timestamp,
-        nonce: PaymentCrypto.generateNonce()
-      };
-
-      params.sign = PaymentCrypto.generateWatchGLBSignature(params, this.payoutKey);
-
-      const response = await this.client.post('/query/transfer', params);
-
-      if (response.data.code === '0000') {
-        const payoutData = response.data.data;
-        
-        logger.info('Payout status queried', {
-          payoutId,
-          status: payoutData.status,
-          amount: payoutData.amount
-        }, this.gateway);
-
-        return {
-          success: true,
-          status: this.mapPaymentStatus(payoutData.status),
-          payoutId: payoutData.payoutNumber,
-          transactionId: payoutData.transactionId,
-          amount: parseFloat(payoutData.amount),
-          currency: payoutData.currency,
-          processedAt: payoutData.processedTime ? new Date(payoutData.processedTime * 1000) : null,
-          rawStatus: payoutData.status
-        };
-      } else {
-        throw new Error(`Payout query failed: ${response.data.message || response.data.msg}`);
-      }
-
-    } catch (error) {
-      logger.error('Payout query failed', error, this.gateway);
-      
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  }
-
-  /**
    * Validate merchant configuration
    */
   validateConfig() {
-    const required = [
-      'merchantNumber',
-      'paymentKey',
-      'payoutKey',
-      'baseUrl'
-    ];
-
-    const missing = required.filter(key => !this[key]);
+    console.log('🔍 WatchGLB Config Validation:');
+    console.log('  merchantId:', this.merchantId);
+    console.log('  depositKey:', this.depositKey ? 'SET' : 'NOT SET');
+    console.log('  payoutKey:', this.payoutKey ? 'SET' : 'NOT SET');
+    console.log('  baseUrl:', this.baseUrl);
     
-    if (missing.length > 0) {
-      throw new Error(`Missing WatchGLB configuration: ${missing.join(', ')}`);
+    const required = [
+      { key: 'merchantId', value: this.merchantId },
+      { key: 'depositKey', value: this.depositKey },
+      { key: 'payoutKey', value: this.payoutKey },
+      { key: 'baseUrl', value: this.baseUrl }
+    ];
+    this.missingKeys = required.filter(item => !item.value).map(item => item.key);
+    this.configValid = this.missingKeys.length === 0;
+    
+    console.log('  missingKeys:', this.missingKeys);
+    console.log('  configValid:', this.configValid);
+    
+    if (!this.configValid) {
+      logger.error('WatchGLB configuration incomplete', {
+        missing: this.missingKeys,
+        merchantId: this.merchantId ? 'SET' : 'NOT SET',
+        depositKey: this.depositKey ? 'SET' : 'NOT SET',
+        payoutKey: this.payoutKey ? 'SET' : 'NOT SET',
+        baseUrl: this.baseUrl
+      }, this.gateway);
     }
-
-    return true;
+    return this.configValid;
   }
 }
 

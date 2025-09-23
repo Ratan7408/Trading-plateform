@@ -21,6 +21,7 @@ import './App.css'
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   // Check if user is already logged in on app load
   useEffect(() => {
@@ -28,6 +29,7 @@ function App() {
     if (token) {
       setIsLoggedIn(true);
     }
+    setIsLoading(false);
   }, []);
 
   const handleLogin = () => {
@@ -44,6 +46,15 @@ function App() {
     setIsLoggedIn(false);
     // Force redirect to login page
     window.location.href = '/';
+  }
+
+  // Show loading while checking authentication
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <div>Loading...</div>
+      </div>
+    );
   }
 
   return (
@@ -69,6 +80,7 @@ function App() {
             <Route path="/bank-settings" element={<BankSettings />} />
             <Route path="/password-settings" element={<PasswordSettings />} />
             <Route path="/trading/*" element={<TradingPage />} />
+            <Route path="*" element={<Navigate to="/home" replace />} />
           </>
         )}
         <Route path="/admin-login" element={<AdminLogin />} />
