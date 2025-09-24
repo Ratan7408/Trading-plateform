@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create axios instance with default configuration
 const api = axios.create({
-  baseURL: 'http://62.72.29.193/api',  // Use Nginx proxy (no port 5000)
+  baseURL: import.meta.env.VITE_API_URL || 'http://62.72.29.193/api',  // Use env or fallback
   timeout: 10000,
   withCredentials: true,
   headers: {

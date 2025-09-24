@@ -54,7 +54,12 @@ const WATCHGLB_BANKS = {
 router.post('/create', async (req, res) => {
   try {
     console.log("📥 Raw req.body:", req.body);
-    const { amount, paymentMethod, subject, bankCode } = req.body;
+    const { amount, paymentMethod, subject, bankCode, currency } = req.body;
+    
+    // Ignore currency field (WatchGLB doesn't need it)
+    if (currency) {
+      console.log("⚠️ Ignoring currency field:", currency);
+    }
 
     if (!amount || !paymentMethod) {
       return res.status(400).json({ error: 'amount and paymentMethod are required' });
@@ -91,7 +96,7 @@ router.post('/create', async (req, res) => {
       page_url: process.env.WATCHGLB_RETURN_URL,
       pay_type: method.payType,
       bank_code: bankCode || getDefaultBankCode(paymentMethod),
-      trade_amount: amount,
+      trade_amount: Number(amount).toFixed(2),
       order_date: new Date().toISOString().slice(0, 19).replace('T', ' '),
       goods_name: subject || 'Recharge',
       // currency removed per WatchGLB spec
