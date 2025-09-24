@@ -29,9 +29,9 @@ const PORT = process.env.PORT || 5000;
 app.use(cors({
   origin: [
     'http://localhost:5173',     // local development
-    'http://182.69.146.75',       // VPS frontend (port 80)
-    'http://182.69.146.75:5173',  // VPS frontend dev
-    'http://182.69.146.75:3000'   // alternative VPS port
+    'http://62.72.29.193',       // VPS frontend (port 80)
+    'http://62.72.29.193:5173',  // VPS frontend dev
+    'http://62.72.29.193:3000'   // alternative VPS port
   ],
   credentials: true,               // allow cookies, auth headers
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
