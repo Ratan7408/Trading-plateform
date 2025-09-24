@@ -29,10 +29,7 @@ export class WatchGLBService {
     this.depositKey = process.env.WATCHGLB_DEPOSIT_KEY;
     this.payoutKey = process.env.WATCHGLB_PAYOUT_KEY;
     
-    console.log('🏗️ WatchGLB Service Constructor:');
-    console.log('  WATCHGLB_MERCHANT_ID:', process.env.WATCHGLB_MERCHANT_ID);
-    console.log('  WATCHGLB_DEPOSIT_KEY:', process.env.WATCHGLB_DEPOSIT_KEY ? 'SET' : 'NOT SET');
-    console.log('  WATCHGLB_PAYOUT_KEY:', process.env.WATCHGLB_PAYOUT_KEY ? 'SET' : 'NOT SET');
+    // Minimal console output per user preference
 
     this.callbackUrl = process.env.WATCHGLB_CALLBACK_URL;
     this.returnUrl = process.env.WATCHGLB_RETURN_URL;
@@ -91,45 +88,28 @@ export class WatchGLBService {
       orderId = PaymentCrypto.generateOrderId('WG');
       const timestamp = Math.floor(Date.now() / 1000);
       
-      // Official WatchGLB API parameters structure (correct parameter names)
+      // Updated WatchGLB API parameters per latest spec
       const params = {
+        version: '1.0',
         mch_id: this.merchantId,
         mch_order_no: orderId,
-        trade_amount: Number(paymentData.amount).toFixed(2),
-        goods_name: paymentData.subject || 'Trading Platform Recharge',
-        pay_type: paymentData.payType || this.getPaymentTypeCode(paymentData.paymentMethod),
         notify_url: this.callbackUrl,
+        page_url: this.returnUrl,
+        pay_type: paymentData.payType || this.getPaymentTypeCode(paymentData.paymentMethod),
+        bank_code: paymentData.bankCode,
+        trade_amount: Number(paymentData.amount).toFixed(2),
         order_date: new Date().toISOString().replace('T', ' ').substring(0, 19),
-        sign_type: 'MD5', // WatchGLB uses MD5, not SHA256
-        version: '1.0' // Required for JSON response
+        goods_name: paymentData.subject || 'Trading Platform Recharge',
+        // currency field intentionally removed
+        sign_type: 'MD5'
       };
 
-      console.log('🔗 WatchGLB API Request Parameters:');
-      console.log('  notify_url:', this.callbackUrl);
-      console.log('  mch_id:', this.merchantId);
-      console.log('  trade_amount:', params.trade_amount);
-      console.log('  pay_type:', params.pay_type);
-
-      // Add optional parameters based on official docs
-      if (paymentData.bankCode && paymentData.paymentMethod === 'bank_transfer') {
-        params.bank_code = paymentData.bankCode;
+      // Remove noisy optional params; keep only bank_code if provided
+      if (!paymentData.bankCode) {
+        delete params.bank_code;
       }
 
-      if (paymentData.userPhone) {
-        params.payer_phone = paymentData.userPhone;
-      }
-
-      // Remove payer_name as it's causing format issues
-      // if (paymentData.userName) {
-      //   params.payer_name = paymentData.userName;
-      // }
-
-      // Add page_url for redirect
-      if (this.returnUrl) {
-        params.page_url = this.returnUrl;
-      }
-
-      // Generate signature using MD5 (not SHA256)
+      // Generate signature using MD5 (uppercase, excluding sign/sign_type)
       params.sign = PaymentCrypto.generateWatchGLBSignature(params, this.depositKey);
 
       logger.paymentInitiated(this.gateway, orderId, paymentData.amount, {

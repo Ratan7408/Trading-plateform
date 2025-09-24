@@ -70,8 +70,8 @@ export class PaymentCrypto {
       
       console.log('[WatchGLB] Sign string:', signString);
       
-          // Generate MD5 hash and convert to lowercase
-          const signature = this.md5(signString).toLowerCase();
+          // Generate MD5 hash and convert to UPPERCASE per latest spec
+          const signature = this.md5(signString).toUpperCase();
       console.log('[WatchGLB] Generated signature:', signature);
       
       return signature;
