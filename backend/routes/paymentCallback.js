@@ -14,7 +14,7 @@ function signParams(params, key) {
   const sortedKeys = Object.keys(filtered).sort();
   const queryString = sortedKeys.map(k => `${k}=${filtered[k]}`).join('&') + `&key=${key}`;
 
-  return crypto.createHash('md5').update(queryString).digest('hex').toLowerCase();
+  return crypto.createHash('md5').update(queryString).digest('hex').toUpperCase();
 }
 
 // WatchGLB payment callback

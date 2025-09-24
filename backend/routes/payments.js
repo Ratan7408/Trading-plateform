@@ -94,7 +94,7 @@ router.post('/create', async (req, res) => {
       trade_amount: amount,
       order_date: new Date().toISOString().slice(0, 19).replace('T', ' '),
       goods_name: subject || 'Recharge',
-      currency: 'INR',
+      // currency removed per WatchGLB spec
       sign_type: 'MD5'
     };
 

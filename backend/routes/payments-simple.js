@@ -61,7 +61,7 @@ router.post('/create', auth, async (req, res) => {
 
     const paymentData = {
       amount: parseFloat(amount),
-      currency: 'INR',
+      // currency removed per WatchGLB spec
       subject: 'Trading Platform Recharge',
       description: `Recharge for ${amount} INR`,
       paymentMethod,
@@ -90,7 +90,7 @@ router.post('/create', auth, async (req, res) => {
           paymentUrl: result.paymentUrl,
           qrCode: result.qrCode,
           amount: result.amount,
-          currency: result.currency,
+          // currency removed per WatchGLB spec
           gateway: gateway || 'watchglb'
         }
       });
@@ -125,7 +125,7 @@ router.get('/:orderId/status', auth, async (req, res) => {
         orderId,
         status: 'pending',
         amount: 500,
-        currency: 'INR',
+        // currency removed per WatchGLB spec
         gateway: 'watchglb'
       }
     });
@@ -200,7 +200,7 @@ router.post('/payout', auth, async (req, res) => {
         data: {
           payoutId: result.payoutId,
           amount: result.amount,
-          currency: result.currency,
+          // currency removed per WatchGLB spec
           status: result.status,
           estimatedTime: result.estimatedTime
         }

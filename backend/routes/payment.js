@@ -346,7 +346,7 @@ router.post('/test/create',
         userId: userId,
         gateway: gateway,
         amount: parseFloat(amount),
-        currency: 'INR',
+        // currency removed per WatchGLB spec
         paymentUrl: paymentUrl,
         paymentMethod: paymentMethod,
         bankCode: bankCode,
@@ -370,7 +370,7 @@ router.post('/test/create',
           paymentUrl: paymentUrl,
           qrCode: paymentMethod === 'upi' ? `upi://pay?pa=merchant@${gateway}&pn=TradingPlatform&am=${amount}&tr=${orderId}` : null,
           amount: parseFloat(amount),
-          currency: 'INR',
+          // currency removed per WatchGLB spec
           expiresAt: transaction.expiresAt,
           gateway: gateway,
           testMode: true
@@ -461,7 +461,7 @@ router.post('/test/callback/:gateway',
         orderNumber: orderId,
         transactionId: `TXN_${Date.now()}`,
         amount: amount,
-        currency: 'INR',
+        // currency removed per WatchGLB spec
         status: status,
         paidTime: Math.floor(Date.now() / 1000),
         sign: 'mock_signature'

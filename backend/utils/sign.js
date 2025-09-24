@@ -18,8 +18,8 @@ export function signParams(params, key) {
 
   console.log('🔐 String to sign (RAW):', stringToSign);
 
-  // 4. MD5 lowercase (WatchGLB expects lowercase)
-  const sign = crypto.createHash('md5').update(stringToSign, 'utf8').digest('hex').toLowerCase();
+  // 4. MD5 UPPERCASE per latest WatchGLB spec
+  const sign = crypto.createHash('md5').update(stringToSign, 'utf8').digest('hex').toUpperCase();
 
   console.log('🔐 Generated sign:', sign);
 
