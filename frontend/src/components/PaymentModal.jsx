@@ -62,13 +62,9 @@ const PaymentModal = ({ isOpen, onClose, onSuccess }) => {
           setBanks([]);
           return;
         }
-        const res = await fetch(`http://localhost:5000/api/payments/banks?method=${encodeURIComponent(formData.paymentMethod)}`);
-        if (!res.ok) {
-          setBanks([]);
-          return;
-        }
-        const data = await res.json();
-        setBanks(Array.isArray(data) ? data : []);
+        const res = await api.get(`/payments/banks`, { params: { method: formData.paymentMethod } });
+        const data = res.data;
+        setBanks(Array.isArray(data) ? data : Array.isArray(data?.banks) ? data.banks : []);
       } catch {
         setBanks([]);
       }

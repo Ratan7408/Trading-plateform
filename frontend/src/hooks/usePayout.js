@@ -1,29 +1,20 @@
 import { useState, useCallback } from 'react';
+import api from '../utils/api';
 
 export default function usePayout() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
 
-  const API_BASE = 'http://localhost:5000';
+  // Use shared axios instance configured with VPS base URL
 
   const requestPayout = useCallback(async ({ transferId, amount, bankCode, receiveName, receiveAccount, remark }) => {
     try {
       setLoading(true);
       setError(null);
 
-      const token = localStorage.getItem('token');
-
-      const res = await fetch(`${API_BASE}/api/payouts/create`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ transferId, amount, bankCode, receiveName, receiveAccount, remark }),
-      });
-
-      const data = await res.json();
+      const res = await api.post('/payouts/create', { transferId, amount, bankCode, receiveName, receiveAccount, remark });
+      const data = res.data;
       setResult(data);
 
       if (!data.success) throw new Error(data.error || 'Payout failed');
@@ -40,18 +31,8 @@ export default function usePayout() {
       setLoading(true);
       setError(null);
 
-      const token = localStorage.getItem('token');
-
-      const res = await fetch(`${API_BASE}/api/payouts/query`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ transferId }),
-      });
-
-      const data = await res.json();
+      const res = await api.post('/payouts/query', { transferId });
+      const data = res.data;
       setResult(data);
 
       if (!data.success) throw new Error(data.error || 'Payout query failed');
@@ -68,17 +49,8 @@ export default function usePayout() {
       setLoading(true);
       setError(null);
 
-      const token = localStorage.getItem('token');
-
-      const res = await fetch(`${API_BASE}/api/payouts/balance`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-
-      const data = await res.json();
+      const res = await api.post('/payouts/balance');
+      const data = res.data;
       setResult(data);
 
       if (!data.success) throw new Error(data.error || 'Balance query failed');
